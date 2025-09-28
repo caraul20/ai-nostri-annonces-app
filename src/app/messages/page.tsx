@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { MessageCircle, ArrowLeft, Send, User, Search } from 'lucide-react';
@@ -8,7 +8,7 @@ import { useChatInbox } from '@/hooks/useChatInbox';
 import { sendMessage, getChatMessages, markMessagesAsRead, Message } from '@/server/repo/messages';
 import Link from 'next/link';
 
-export default function MessagesPage() {
+function MessagesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, loading } = useAuth();
@@ -329,5 +329,26 @@ export default function MessagesPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Loading component pentru Suspense
+function MessagesLoading() {
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="animate-pulse">
+        <div className="h-8 bg-gray-200 rounded w-48 mb-4"></div>
+        <div className="h-4 bg-gray-200 rounded w-32"></div>
+      </div>
+    </div>
+  );
+}
+
+// Export principal cu Suspense boundary
+export default function MessagesPage() {
+  return (
+    <Suspense fallback={<MessagesLoading />}>
+      <MessagesContent />
+    </Suspense>
   );
 }
