@@ -1,0 +1,92 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+             firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
+             firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    function isValidImageFile() {
+      return request.resource.contentType.matches('image/.*') &&
+             request.resource.size < 5 * 1024 * 1024; // Max 5MB
+    }
+    
+    function isValidImageFormat() {
+      return request.resource.contentType in [
+        'image/jpeg', 
+        'image/png', 
+        'image/gif', 
+        'image/webp'
+      ];
+    }
+    
+    // Images pentru listings - structura: images/listings/{userId}/{listingId}/{imageId}
+    match /images/listings/{userId}/{listingId}/{imageId} {
+      // Read - toți pot vedea imaginile (pentru anunțuri publice)
+      allow read: if true;
+      
+      // Write (create/update) - doar owner-ul sau admin
+      allow write: if (isOwner(userId) || isAdmin()) &&
+                      isValidImageFile() &&
+                      isValidImageFormat();
+      
+      // Delete - doar owner-ul sau admin
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+    
+    // Profile pictures - structura: images/profiles/{userId}/{imageId}
+    match /images/profiles/{userId}/{imageId} {
+      // Read - toți pot vedea pozele de profil
+      allow read: if true;
+      
+      // Write - doar owner-ul
+      allow write: if isOwner(userId) &&
+                      isValidImageFile() &&
+                      isValidImageFormat();
+      
+      // Delete - doar owner-ul sau admin
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+    
+    // Temporary uploads - pentru procesarea imaginilor
+    match /temp/{userId}/{imageId} {
+      // Read/Write - doar owner-ul pentru max 1 oră
+      allow read, write: if isOwner(userId) &&
+                            isValidImageFile() &&
+                            isValidImageFormat();
+      
+      // Delete - owner sau admin
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+    
+    // Admin uploads - pentru conținut administrativ
+    match /admin/{path=**} {
+      allow read: if true; // Conținutul admin poate fi public
+      allow write, delete: if isAdmin();
+    }
+    
+    // Backup și export - doar pentru admin
+    match /backups/{path=**} {
+      allow read, write, delete: if isAdmin();
+    }
+    
+    // Documents și alte fișiere - pentru viitoare extensii
+    match /documents/{userId}/{documentId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) &&
+                      request.resource.size < 10 * 1024 * 1024; // Max 10MB pentru documente
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+  }
+}

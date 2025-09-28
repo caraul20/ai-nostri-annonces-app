@@ -1,0 +1,214 @@
+'use server';
+
+// TODO: Migrare către Firebase când va fi activat
+import { getListings, Listing } from '@/server/repo/repoMock';
+
+// Verifică dacă utilizatorul este admin
+async function verifyAdmin(userId: string): Promise<boolean> {
+  try {
+    const userDoc = await getDoc(doc(db, 'users', userId));
+    if (!userDoc.exists()) return false;
+    
+    const userData = userDoc.data();
+    return userData.role === 'admin';
+  } catch (error) {
+    console.error('Eroare la verificarea admin:', error);
+    return false;
+  }
+}
+
+export async function getListings(filter: 'all' | 'active' | 'hidden' | 'reported' = 'all') {
+  try {
+    // TODO: Verifică autentificarea și rolul admin în producție
+    // const currentUser = auth.currentUser;
+    // if (!currentUser || !await verifyAdmin(currentUser.uid)) {
+    //   throw new Error('Acces neautorizat');
+    // }
+
+    let q;
+    
+    switch (filter) {
+      case 'active':
+        q = query(
+          collection(db, 'listings'),
+          where('status', '==', 'active'),
+          orderBy('createdAt', 'desc'),
+          firestoreLimit(100)
+        );
+        break;
+      case 'hidden':
+        q = query(
+          collection(db, 'listings'),
+          where('status', '==', 'hidden'),
+          orderBy('createdAt', 'desc'),
+          firestoreLimit(100)
+        );
+        break;
+      case 'reported':
+        // TODO: Implementează sistemul de raportare
+        q = query(
+          collection(db, 'listings'),
+          where('reportCount', '>', 0),
+          orderBy('reportCount', 'desc'),
+          firestoreLimit(100)
+        );
+        break;
+      default: // 'all'
+        q = query(
+          collection(db, 'listings'),
+          orderBy('createdAt', 'desc'),
+          firestoreLimit(100)
+        );
+    }
+
+    const querySnapshot = await getDocs(q);
+    const listings = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Listing));
+
+    return { success: true, listings };
+  } catch (error) {
+    console.error('Eroare la încărcarea anunțurilor:', error);
+    
+    // Fallback la date mock în caz de eroare
+    const mockListings: Listing[] = [
+      {
+        id: '1',
+        title: 'Apartament 3 camere în centru',
+        description: 'Apartament frumos în centrul orașului, complet mobilat și utilat.',
+        price: 120000,
+        images: ['https://via.placeholder.com/400x300/4CAF50/ffffff?text=Apartament'],
+        categoryId: '1',
+        locationId: '1',
+        userId: 'user1',
+        status: 'active',
+        createdAt: new Date()
+      },
+      {
+        id: '2',
+        title: 'BMW Seria 3 - 2019',
+        description: 'Mașină în stare excelentă, service-uri la zi.',
+        price: 25000,
+        images: ['https://via.placeholder.com/400x300/2196F3/ffffff?text=BMW'],
+        categoryId: '2',
+        locationId: '2',
+        userId: 'user2',
+        status: 'hidden',
+        createdAt: new Date()
+      }
+    ];
+
+    return { success: true, listings: mockListings };
+  }
+}
+
+export async function toggleListingStatus(listingId: string, newStatus: 'active' | 'hidden') {
+  try {
+    // TODO: Verifică autentificarea și rolul admin în producție
+    // const currentUser = auth.currentUser;
+    // if (!currentUser || !await verifyAdmin(currentUser.uid)) {
+    //   return { success: false, error: 'Acces neautorizat' };
+    // }
+
+    const listingRef = doc(db, 'listings', listingId);
+    
+    await updateDoc(listingRef, {
+      status: newStatus,
+      updatedAt: serverTimestamp(),
+      moderatedBy: 'admin', // TODO: Folosește ID-ul admin-ului real
+      moderatedAt: serverTimestamp()
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Eroare la modificarea statusului:', error);
+    return { 
+      success: false, 
+      error: 'A apărut o eroare la modificarea statusului anunțului' 
+    };
+  }
+}
+
+export async function deleteListingAdmin(listingId: string) {
+  try {
+    // TODO: Verifică autentificarea și rolul admin în producție
+    // const currentUser = auth.currentUser;
+    // if (!currentUser || !await verifyAdmin(currentUser.uid)) {
+    //   return { success: false, error: 'Acces neautorizat' };
+    // }
+
+    const listingRef = doc(db, 'listings', listingId);
+    
+    // În loc să ștergem complet, marcăm ca șters pentru audit
+    await updateDoc(listingRef, {
+      status: 'deleted',
+      deletedAt: serverTimestamp(),
+      deletedBy: 'admin', // TODO: Folosește ID-ul admin-ului real
+      updatedAt: serverTimestamp()
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Eroare la ștergerea anunțului:', error);
+    return { 
+      success: false, 
+      error: 'A apărut o eroare la ștergerea anunțului' 
+    };
+  }
+}
+
+// Rate limiting pentru publicarea anunțurilor
+export async function checkRateLimit(userId: string): Promise<{ allowed: boolean; remaining: number }> {
+  try {
+    const now = new Date();
+    const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+
+    // Verifică câte anunțuri a publicat în ultimele 5 minute
+    const recentListingsQuery = query(
+      collection(db, 'listings'),
+      where('userId', '==', userId),
+      where('createdAt', '>=', fiveMinutesAgo),
+      where('status', '!=', 'deleted')
+    );
+
+    const recentListings = await getDocs(recentListingsQuery);
+    const count = recentListings.size;
+    const maxAllowed = 3;
+
+    return {
+      allowed: count < maxAllowed,
+      remaining: Math.max(0, maxAllowed - count)
+    };
+  } catch (error) {
+    console.error('Eroare la verificarea rate limit:', error);
+    // În caz de eroare, permitem publicarea
+    return { allowed: true, remaining: 3 };
+  }
+}
+
+// Funcție pentru a seta un utilizator ca admin (pentru seed/setup)
+export async function setUserAsAdmin(userId: string, currentAdminId: string) {
+  try {
+    // Verifică dacă utilizatorul curent este admin
+    if (!await verifyAdmin(currentAdminId)) {
+      return { success: false, error: 'Acces neautorizat' };
+    }
+
+    const userRef = doc(db, 'users', userId);
+    await updateDoc(userRef, {
+      role: 'admin',
+      updatedAt: serverTimestamp(),
+      promotedBy: currentAdminId,
+      promotedAt: serverTimestamp()
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Eroare la setarea admin:', error);
+    return { 
+      success: false, 
+      error: 'A apărut o eroare la setarea utilizatorului ca admin' 
+    };
+  }
+}

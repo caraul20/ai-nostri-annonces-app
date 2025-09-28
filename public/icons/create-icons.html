@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generate PWA Icons - Ai Nostri</title>
+</head>
+<body>
+    <h1>Generate PWA Icons</h1>
+    <p>Click the buttons below to download the PWA icons:</p>
+    <div id="downloads"></div>
+
+    <script>
+        const sizes = [192, 256, 384, 512];
+        const downloads = document.getElementById('downloads');
+
+        function generateIcon(size) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = size;
+            canvas.height = size;
+            
+            // Background verde (tema Ai Nostri)
+            ctx.fillStyle = '#059669';
+            ctx.fillRect(0, 0, size, size);
+            
+            // Border radius effect (aproximativ)
+            ctx.globalCompositeOperation = 'destination-in';
+            ctx.beginPath();
+            ctx.roundRect(0, 0, size, size, size * 0.125);
+            ctx.fill();
+            ctx.globalCompositeOperation = 'source-over';
+            
+            // Casa (emoji simplificat)
+            const centerX = size / 2;
+            const centerY = size / 2 - size * 0.05;
+            const houseSize = size * 0.35;
+            
+            // Casa - fundal alb
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY - houseSize * 0.6);
+            ctx.lineTo(centerX - houseSize * 0.8, centerY);
+            ctx.lineTo(centerX - houseSize * 0.8, centerY + houseSize * 0.8);
+            ctx.lineTo(centerX + houseSize * 0.8, centerY + houseSize * 0.8);
+            ctx.lineTo(centerX + houseSize * 0.8, centerY);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Acoperis
+            ctx.fillStyle = '#047857';
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY - houseSize * 0.6);
+            ctx.lineTo(centerX - houseSize * 0.9, centerY + houseSize * 0.1);
+            ctx.lineTo(centerX + houseSize * 0.9, centerY + houseSize * 0.1);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Usa
+            ctx.fillStyle = '#059669';
+            ctx.fillRect(centerX - houseSize * 0.2, centerY + houseSize * 0.2, houseSize * 0.4, houseSize * 0.6);
+            
+            // Ferestre
+            ctx.fillStyle = '#059669';
+            ctx.fillRect(centerX - houseSize * 0.65, centerY - houseSize * 0.1, houseSize * 0.25, houseSize * 0.25);
+            ctx.fillRect(centerX + houseSize * 0.4, centerY - houseSize * 0.1, houseSize * 0.25, houseSize * 0.25);
+            
+            // Text "AN"
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${size * 0.12}px Arial, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('AN', centerX, centerY + houseSize * 1.2);
+            
+            // Steagul României (mic)
+            const flagY = centerY + houseSize * 1.5;
+            const flagWidth = size * 0.15;
+            const flagHeight = size * 0.02;
+            
+            ctx.fillStyle = '#002B7F'; // Albastru
+            ctx.fillRect(centerX - flagWidth/2, flagY, flagWidth/3, flagHeight);
+            ctx.fillStyle = '#FCD116'; // Galben
+            ctx.fillRect(centerX - flagWidth/6, flagY, flagWidth/3, flagHeight);
+            ctx.fillStyle = '#CE1126'; // Roșu
+            ctx.fillRect(centerX + flagWidth/6, flagY, flagWidth/3, flagHeight);
+            
+            // Creează link de download
+            canvas.toBlob(function(blob) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `icon-${size}.png`;
+                a.textContent = `📱 Download icon-${size}.png`;
+                a.style.display = 'block';
+                a.style.margin = '10px 0';
+                a.style.padding = '10px';
+                a.style.background = '#f0f0f0';
+                a.style.textDecoration = 'none';
+                a.style.borderRadius = '5px';
+                downloads.appendChild(a);
+                
+                // Auto-click pentru download
+                // a.click();
+            }, 'image/png', 1.0);
+        }
+
+        // Generează toate mărimile
+        sizes.forEach(size => generateIcon(size));
+        
+        // Instrucțiuni
+        const instructions = document.createElement('div');
+        instructions.innerHTML = `
+            <h2>📋 Instrucțiuni:</h2>
+            <ol>
+                <li>Click pe fiecare link pentru a descărca iconurile</li>
+                <li>Salvează fișierele în <code>public/icons/</code></li>
+                <li>Numele fișierelor trebuie să fie exact: <code>icon-192.png</code>, <code>icon-256.png</code>, etc.</li>
+                <li>Pentru producție, folosește iconuri profesionale create în Figma/Photoshop</li>
+            </ol>
+            <p><strong>🎨 Pentru iconuri profesionale:</strong></p>
+            <ul>
+                <li>Folosește SVG-ul din <code>public/icons/icon-template.svg</code></li>
+                <li>Convertește la PNG în mărimile necesare</li>
+                <li>Asigură-te că iconurile sunt optimizate pentru PWA</li>
+            </ul>
+        `;
+        instructions.style.marginTop = '30px';
+        instructions.style.padding = '20px';
+        instructions.style.background = '#f9f9f9';
+        instructions.style.borderRadius = '10px';
+        document.body.appendChild(instructions);
+        
+        console.log('✅ Iconuri PWA generate! Click pe linkuri pentru download.');
+    </script>
+</body>
+</html>

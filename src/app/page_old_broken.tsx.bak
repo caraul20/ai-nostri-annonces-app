@@ -1,0 +1,194 @@
+import { Suspense } from 'react';
+import { Metadata } from 'next';
+import { getListings, getCategories, getLocations, getCategoryById, getLocationById } from '@/server/repo/repoMock';
+import AdCard from '@/components/AdCard';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
+import { Plus, Package } from 'lucide-react';
+
+// ISR - revalidare la 60 secunde
+export const revalidate = 60;
+
+// SEO Metadata dinamic
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    title: 'Ai Nostri - Anunțuri pentru românii și moldovenii din Franța',
+    description: 'Platforma de anunțuri dedicată comunității românești și moldovenești din Franța. Găsește și publică anunțuri în limba română.',
+    keywords: 'anunturi, romani franta, moldoveni franta, clasificate, diaspora, comunitate',
+    openGraph: {
+      title: 'Ai Nostri - Comunitatea românească din Franța',
+      description: 'Platforma de anunțuri pentru diaspora românească și moldovenească',
+      type: 'website',
+    },
+  };
+}
+
+interface SearchParams {
+  q?: string;
+  category?: string;
+  location?: string;
+  min?: string;
+  max?: string;
+  page?: string;
+}
+
+type HomePageProps = {
+  searchParams: Promise<SearchParams>;
+};
+export default async function HomePage({ searchParams }: HomePageProps) {
+  // Await the promise-based searchParams in Next.js 15
+  const sp = await searchParams;
+
+  // Construire les filtres à partir des paramètres de recherche
+  const filters = {
+    q: sp.q,
+    categoryId: sp.category,
+    locationId: sp.location,
+    minPrice: sp.min ? parseInt(sp.min) : undefined,
+    maxPrice: sp.max ? parseInt(sp.max) : undefined,
+    page: sp.page ? parseInt(sp.page) : 1,
+  };
+
+  // Charger les données en parallèle
+  const [listingsResult, categories, locations] = await Promise.all([
+    getListings(filters),
+    getCategories(),
+    getLocations(),
+  ]);
+
+  // Enrichir les listings avec les données de catégorie et localisation
+  const enrichedListings = await Promise.all(
+    listingsResult.listings.map(async (listing) => {
+      const [category, location] = await Promise.all([
+        getCategoryById(listing.categoryId),
+        getLocationById(listing.locationId),
+      ]);
+      return { listing, category, location };
+    })
+  );
+
+  return (
+    <div className="bg-white">
+      {/* Hero Section cu Noua Paletă de Culori */}
+      <section className="bg-gradient-to-br from-green-600/70 via-yellow-500/60 to-orange-500/80 py-20 relative overflow-hidden">
+        {/* Imagine de fundal din Unsplash - Oameni care se țin de mână */}
+        <div className="absolute inset-0">
+          <img 
+            src="https://images.unsplash.com/photo-1529156069898-49953e39b3ac?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2089&q=80"
+            alt="Oameni care se țin de mână - unire și prietenie"
+            className="w-full h-full object-cover opacity-30"
+          />
+        </div>
+        
+        {/* Overlay pentru contrast îmbunătățit */}
+        <div className="absolute inset-0 bg-gradient-to-br from-green-900/10 via-transparent to-orange-900/10"></div>
+        
+        <div className="container mx-auto px-4 text-center relative z-10">
+          <h1 className="text-5xl md:text-6xl font-bold text-white mb-4">
+            Bun venit la <span className="text-yellow-300">Ai Nostri</span>.
+          </h1>
+          <p className="text-xl text-green-100 mb-8 max-w-2xl mx-auto">
+            Cea mai mare platformă de anunțuri clasificate din România
+          </p>
+          
+          {/* Link către pagina de publicare */}
+          <div className="mb-8">
+            <Link href="/new">
+              <Button className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-4 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105">
+                <Plus className="h-5 w-5 mr-2" />
+                Publică un anunț gratuit
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Section principale avec filtres et listings */}
+      <section className="py-16 bg-gray-50">
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            {/* Sidebar avec filtres */}
+            <div className="lg:col-span-1">
+              {/* TODO: Adaugă filtre aici */}
+              <div className="text-sm text-gray-500">Filtre vor fi adăugate</div>
+            </div>
+
+            {/* Liste des anunțuri */}
+            <div className="lg:col-span-3">
+                <h2 className="text-2xl font-bold text-gray-800">
+                  Anunțuri recente ({listingsResult.total})
+                </h2>
+                {sp.q && (
+                  <div className="text-sm text-gray-600">
+                    Rezultate pentru: <span className="font-semibold">{sp.q}</span>
+                  </div>
+                )}
+              </div>
+
+              {enrichedListings.length > 0 ? (
+                  {enrichedListings.map(({ listing, category, location }) => (
+                    <AdCard
+                      key={listing.id}
+                      listing={listing}
+                      category={category}
+                      location={location}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-16">
+                  <Package className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-gray-700 mb-2">
+                    Niciun anunț găsit
+                  </h3>
+                  <p className="text-gray-500 mb-6">
+                    {sp.q || sp.category || sp.location
+                      ? 'Încearcă să modifici filtrele de căutare.'
+                      : 'Fii primul care publică un anunț!'}
+                  </p>
+                  <Link href="/new">
+                    <Button className="bg-green-600 hover:bg-green-700 text-white">
+                      Publică primul anunț
+                    </Button>
+                  </Link>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      {/* Section categorii populare */}
+      <section className="py-16 bg-white">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-900">
+              Cele mai noi anunțuri ({listingsResult.total})
+            </h2>
+            <p className="text-gray-600 max-w-2xl mx-auto">
+              Explorează cele mai noi anunțuri
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {categories.slice(0, 8).map((category) => (
+              <Link
+                key={category.id}
+                href={`/?category=${category.id}`}
+                className="group"
+              >
+                <div className="bg-gray-50 rounded-xl p-6 text-center hover:bg-green-50 hover:shadow-lg transition-all duration-200">
+                  <div className="text-4xl mb-3">📦</div>
+                  <h3 className="font-semibold text-gray-800 group-hover:text-green-600 transition-colors">
+                    {category.name}
+                  </h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Vezi toate anunțurile
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}

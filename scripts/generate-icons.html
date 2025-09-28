@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generate PWA Icons</title>
+</head>
+<body>
+    <canvas id="canvas" style="display: none;"></canvas>
+    <div id="downloads"></div>
+
+    <script>
+        // Generate PWA icons for Ai Nostri
+        const sizes = [192, 256, 384, 512];
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const downloads = document.getElementById('downloads');
+
+        function generateIcon(size) {
+            canvas.width = size;
+            canvas.height = size;
+            
+            // Background
+            ctx.fillStyle = '#059669'; // Green theme color
+            ctx.fillRect(0, 0, size, size);
+            
+            // House icon (simplified)
+            const centerX = size / 2;
+            const centerY = size / 2;
+            const iconSize = size * 0.4;
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `${iconSize}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('🏠', centerX, centerY);
+            
+            // Add text "AN" for Ai Nostri
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${size * 0.15}px Arial`;
+            ctx.fillText('AN', centerX, centerY + iconSize * 0.4);
+            
+            // Convert to blob and create download link
+            canvas.toBlob(function(blob) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `icon-${size}.png`;
+                a.textContent = `Download icon-${size}.png`;
+                a.style.display = 'block';
+                a.style.margin = '10px 0';
+                downloads.appendChild(a);
+            });
+        }
+
+        // Generate all sizes
+        sizes.forEach(size => generateIcon(size));
+        
+        console.log('Icons generated! Click the links to download.');
+    </script>
+</body>
+</html>

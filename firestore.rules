@@ -1,0 +1,109 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    function isOwnerOrAdmin(userId) {
+      return isOwner(userId) || isAdmin();
+    }
+    
+    // Users collection - doar self read/write
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+      allow read: if isAdmin(); // Admin poate citi toate profilurile
+    }
+    
+    // Categories collection - read pentru toți, write doar pentru admin
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    // Locations collection - read pentru toți, write doar pentru admin
+    match /locations/{locationId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    // Listings collection - reguli complexe
+    match /listings/{listingId} {
+      // Read - toți pot citi anunțurile active
+      allow read: if true;
+      
+      // Create - doar utilizatori autentificați
+      allow create: if isAuthenticated() && 
+                       request.auth.uid == resource.data.userId &&
+                       request.resource.data.status == 'active';
+      
+      // Update - doar owner sau admin
+      allow update: if isOwnerOrAdmin(resource.data.userId) &&
+                       // Owner poate modifica doar anumite câmpuri
+                       (isOwner(resource.data.userId) ? 
+                         // Owner nu poate modifica userId și poate seta doar status-uri permise
+                         request.resource.data.userId == resource.data.userId &&
+                         request.resource.data.status in ['active', 'inactive', 'sold']
+                         :
+                         // Admin poate modifica orice, inclusiv să ascundă anunțuri
+                         true
+                       );
+      
+      // Delete - doar owner sau admin
+      allow delete: if isOwnerOrAdmin(resource.data.userId);
+    }
+    
+    // Rate limiting collection - pentru a urmări publicările
+    match /rate_limits/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+    
+    // Admin collections - doar pentru admin
+    match /admin_logs/{logId} {
+      allow read, write: if isAdmin();
+    }
+    
+    // Notifications collection
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && 
+                     request.auth.uid == resource.data.userId;
+      allow write: if isAdmin() || 
+                      (isAuthenticated() && request.auth.uid == resource.data.userId);
+    }
+    
+    // Reports collection - pentru raportarea abuzurilor
+    match /reports/{reportId} {
+      allow create: if isAuthenticated();
+      allow read, update, delete: if isAdmin();
+    }
+    
+    // Favorites collection - pentru anunțurile favorite
+    match /favorites/{favoriteId} {
+      allow read, write: if isAuthenticated() && 
+                            request.auth.uid == resource.data.userId;
+    }
+    
+    // Messages collection - pentru sistemul de mesagerie
+    match /conversations/{conversationId} {
+      allow read, write: if isAuthenticated() && 
+                            request.auth.uid in resource.data.participants;
+      
+      match /messages/{messageId} {
+        allow read, write: if isAuthenticated() && 
+                              request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
+      }
+    }
+  }
+}

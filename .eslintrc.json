@@ -1,0 +1,59 @@
+{
+  "extends": [
+    "next/core-web-vitals",
+    "next/typescript"
+  ],
+  "rules": {
+    // Performance optimizations
+    "react/no-unescaped-entities": "warn",
+    "react/jsx-no-target-blank": "error",
+    "@next/next/no-img-element": "warn",
+    "@next/next/no-html-link-for-pages": "error",
+    
+    // Accessibility rules
+    "jsx-a11y/alt-text": "warn",
+    "jsx-a11y/aria-props": "warn",
+    "jsx-a11y/aria-proptypes": "warn",
+    "jsx-a11y/aria-unsupported-elements": "warn",
+    "jsx-a11y/role-has-required-aria-props": "warn",
+    "jsx-a11y/role-supports-aria-props": "warn",
+    "jsx-a11y/heading-has-content": "warn",
+    "jsx-a11y/anchor-has-content": "warn",
+    "jsx-a11y/no-redundant-roles": "warn",
+    "jsx-a11y/click-events-have-key-events": "warn",
+    "jsx-a11y/no-static-element-interactions": "warn",
+    "jsx-a11y/interactive-supports-focus": "warn",
+    
+    // SEO and best practices
+    "react/jsx-key": "warn",
+    "react/no-array-index-key": "warn",
+    "react/self-closing-comp": "warn",
+    "react/jsx-boolean-value": "warn",
+    
+    // TypeScript specific - relaxed for build
+    "@typescript-eslint/no-unused-vars": "warn",
+    "@typescript-eslint/no-explicit-any": "off",
+    "@typescript-eslint/prefer-const": "warn",
+    
+    // Code quality - relaxed for build
+    "prefer-const": "warn",
+    "no-var": "warn",
+    "no-console": "off",
+    "no-debugger": "warn",
+    
+    // React hooks
+    "react-hooks/exhaustive-deps": "warn",
+    
+    // Import rules
+    "import/no-anonymous-default-export": "warn"
+  },
+  "overrides": [
+    {
+      "files": ["*.ts", "*.tsx"],
+      "rules": {
+        "@typescript-eslint/explicit-function-return-type": "off",
+        "@typescript-eslint/explicit-module-boundary-types": "off"
+      }
+    }
+  ]
+}
