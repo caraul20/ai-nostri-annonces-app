@@ -5,6 +5,25 @@ import { getSimilarListings } from '@/server/repo/repoFirebase';
 import { Listing } from '@/server/repo/repoFirebase';
 import AdCard from '@/components/AdCard';
 
+// Serialized listing type for AdCard
+interface SerializedListing {
+  id?: string;
+  title: string;
+  description: string;
+  price: number;
+  images: string[];
+  categoryId: string;
+  locationId: string;
+  userId: string;
+  status: 'active' | 'inactive' | 'sold' | 'hidden' | 'deleted';
+  slug?: string;
+  createdAt: string | null;
+  updatedAt: string | null;
+  views?: number;
+  featured?: boolean;
+  expiresAt: string | null;
+}
+
 interface SimilarListingsProps {
   categoryId: string;
   locationId: string;
@@ -18,7 +37,7 @@ export default function SimilarListings({
   excludeId, 
   limit = 4 
 }: SimilarListingsProps) {
-  const [listings, setListings] = useState<Listing[]>([]);
+  const [listings, setListings] = useState<SerializedListing[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -33,9 +52,30 @@ export default function SimilarListings({
         excludeId,
         limit
       });
-      setListings(similarListings);
+      
+      // Serialize listings for AdCard component
+      const serializedListings = similarListings.map(listing => ({
+        id: listing.id,
+        title: listing.title,
+        description: listing.description,
+        price: listing.price,
+        images: listing.images,
+        categoryId: listing.categoryId,
+        locationId: listing.locationId,
+        userId: listing.userId,
+        status: listing.status,
+        slug: listing.slug,
+        createdAt: listing.createdAt ? new Date(listing.createdAt).toISOString() : null,
+        updatedAt: listing.updatedAt ? new Date(listing.updatedAt).toISOString() : null,
+        views: listing.views || 0,
+        featured: listing.featured || false,
+        expiresAt: listing.expiresAt ? new Date(listing.expiresAt).toISOString() : null
+      }));
+      
+      setListings(serializedListings);
     } catch (error) {
       console.error('Error fetching similar listings:', error);
+      setListings([]);
     } finally {
       setIsLoading(false);
     }
