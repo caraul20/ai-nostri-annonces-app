@@ -410,7 +410,7 @@ body {
   border-radius: var(--radius-md);
 }
 
-/* Screen Reader Only */
+/* Accessibility Utilities */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -423,7 +423,68 @@ body {
   border: 0;
 }
 
-/* PWA Install Prompt Animation */
+.focus-visible {
+  outline: 2px solid #10b981;
+  outline-offset: 2px;
+}
+
+.focus-ring {
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-600 focus-visible:ring-offset-2;
+}
+
+/* Skip to content link */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background: #000;
+  color: #fff;
+  padding: 8px;
+  text-decoration: none;
+  z-index: 1000;
+  border-radius: 4px;
+}
+
+.skip-link:focus {
+  top: 6px;
+}
+
+/* Button Utilities */
+.btn-primary {
+  @apply inline-flex items-center justify-center px-4 py-2 rounded-2xl bg-green-600 text-white hover:bg-green-700 min-h-[44px] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-600 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-secondary {
+  @apply inline-flex items-center justify-center px-3 py-2 rounded-2xl border bg-white hover:bg-gray-50 min-h-[44px] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+/* Card Utility */
+.card {
+  @apply bg-white border rounded-2xl p-4 md:p-6;
+}
+
+/* Text Utilities */
+.line-clamp-1 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
+
+.line-clamp-2 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.line-clamp-3 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
 @keyframes slide-up {
   from {
     transform: translateY(100%);
@@ -433,10 +494,6 @@ body {
     transform: translateY(0);
     opacity: 1;
   }
-}
-
-.animate-slide-up {
-  animation: slide-up 0.3s ease-out;
 }
 
 /* PWA Specific Styles */

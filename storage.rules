@@ -2,17 +2,9 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     
-    // Helper functions
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-    
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
-    
-    function isAdmin() {
-      return isAuthenticated() && 
+    // Images folder - organized by type and user
+    match /images/{folder}/{userId}/{fileName} {
+      // Anyone can read images
              firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
              firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }

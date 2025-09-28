@@ -1,148 +1,198 @@
 'use server';
 
-// TODO: Migrare către Firebase când va fi activat
-import { getListings as getListingsFromRepo, Listing } from '@/server/repo/repoMock';
+// Firebase Admin Actions - AI NOSTRI PWA
+import { 
+  getListings as getFirebaseListings,
+  toggleListingStatus as toggleFirebaseListingStatus,
+  deleteListingAdmin as deleteFirebaseListingAdmin,
+  setUserAsAdmin as setFirebaseUserAsAdmin,
+  Listing,
+  ListingFilters
+} from '@/server/repo/repoFirebase';
+import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
-// Mock pentru verificarea admin
+// Verify if user is admin
 async function verifyAdmin(userId: string): Promise<boolean> {
-  // TODO: Implementează verificarea reală când Firebase va fi activat
-  console.log('Mock: Verificare admin pentru', userId);
-  return true; // Mock - toți utilizatorii sunt admin în dezvoltare
+  try {
+    if (!userId) return false;
+    
+    const userDoc = await getDoc(doc(db, 'users', userId));
+    if (!userDoc.exists()) return false;
+    
+    const userData = userDoc.data();
+    return userData.role === 'admin';
+  } catch (error) {
+    console.error('Error verifying admin:', error);
+    return false;
+  }
 }
 
 export async function getListings(filter: 'all' | 'active' | 'hidden' | 'reported' = 'all') {
   try {
-    console.log('Mock Admin: Încărcare anunțuri cu filtru', filter);
+    console.log('Firebase Admin: Loading listings with filter', filter);
     
-    // Folosim repo-ul mock cu filtrele corespunzătoare
-    let statusFilter: string | undefined;
+    const filters: ListingFilters = {};
     
     switch (filter) {
       case 'active':
-        statusFilter = 'active';
+        filters.status = 'active';
         break;
       case 'hidden':
-        statusFilter = 'hidden';
+        filters.status = 'hidden';
         break;
       case 'reported':
-        // TODO: Implementează sistemul de raportare
-        statusFilter = 'active'; // Fallback pentru mock
+        // TODO: Implement reporting system with proper field
+        filters.status = 'active'; // For now, show active listings
         break;
-      default: // 'all'
-        statusFilter = undefined; // Toate statusurile
+      default:
+        // Show all except deleted
+        break;
     }
-
-    const result = await getListingsFromRepo({ 
-      status: statusFilter,
-      limit: 100 
-    });
-
+    
+    const result = await getFirebaseListings(filters);
+    
+    // For 'reported' filter, simulate some reported listings
+    if (filter === 'reported') {
+      const reportedListings = result.listings.slice(0, 2).map(listing => ({
+        ...listing,
+        reportCount: Math.floor(Math.random() * 5) + 1,
+        reports: ['Spam', 'Conținut inadecvat']
+      }));
+      
+      return { success: true, listings: reportedListings };
+    }
+    
     return { success: true, listings: result.listings };
   } catch (error) {
-    console.error('Eroare la încărcarea anunțurilor admin:', error);
-    
-    // Fallback la date mock în caz de eroare
-    const mockListings: Listing[] = [
-      {
-        id: '1',
-        title: 'Apartament 2 camere Paris 13ème',
-        description: 'Apartament frumos în Paris, zona românească.',
-        price: 1200,
-        images: ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400&h=300&fit=crop'],
-        categoryId: '1',
-        locationId: '1',
-        userId: 'user1',
-        status: 'active',
-        createdAt: new Date(),
-        slug: 'apartament-2-camere-paris-13eme-1'
-      },
-      {
-        id: '2',
-        title: 'Renault Clio 2020 - Proprietar român',
-        description: 'Mașină în stare perfectă, service-uri la zi.',
-        price: 12500,
-        images: ['https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?w=400&h=300&fit=crop'],
-        categoryId: '2',
-        locationId: '2',
-        userId: 'user2',
-        status: 'hidden',
-        createdAt: new Date(),
-        slug: 'renault-clio-2020-proprietar-roman-2'
-      }
-    ];
-
-    return { success: true, listings: mockListings };
+    console.error('Error loading admin listings:', error);
+    return { success: false, error: 'Nu s-au putut încărca anunțurile', listings: [] };
   }
 }
 
-export async function toggleListingStatus(listingId: string, newStatus: 'active' | 'hidden') {
+export async function toggleListingStatus(
+  listingId: string,
+  newStatus: 'active' | 'hidden',
+  adminId?: string
+) {
   try {
-    console.log('Mock Admin: Schimbare status anunț', listingId, 'la', newStatus);
+    console.log(`Firebase Admin: Toggle listing ${listingId} to ${newStatus}`);
     
-    // TODO: Implementează logica reală când Firebase va fi activat
-    // Simulăm o operațiune de actualizare
-    await new Promise(resolve => setTimeout(resolve, 500));
-
+    // Verify admin permissions if adminId provided
+    if (adminId && !await verifyAdmin(adminId)) {
+      return { success: false, error: 'Acces neautorizat' };
+    }
+    
+    await toggleFirebaseListingStatus(listingId, newStatus);
+    
     return { success: true };
   } catch (error) {
-    console.error('Eroare la modificarea statusului:', error);
-    return { 
-      success: false, 
-      error: 'A apărut o eroare la modificarea statusului anunțului' 
-    };
+    console.error('Error toggling listing status:', error);
+    return { success: false, error: 'Nu s-a putut schimba statusul anunțului' };
   }
 }
 
-export async function deleteListingAdmin(listingId: string) {
+export async function deleteListingAdmin(listingId: string, adminId?: string) {
   try {
-    console.log('Mock Admin: Ștergere anunț', listingId);
+    console.log(`Firebase Admin: Delete listing ${listingId}`);
     
-    // TODO: Implementează logica reală când Firebase va fi activat
-    // Simulăm o operațiune de ștergere (soft delete)
-    await new Promise(resolve => setTimeout(resolve, 500));
-
+    // Verify admin permissions if adminId provided
+    if (adminId && !await verifyAdmin(adminId)) {
+      return { success: false, error: 'Acces neautorizat' };
+    }
+    
+    await deleteFirebaseListingAdmin(listingId);
+    
     return { success: true };
   } catch (error) {
-    console.error('Eroare la ștergerea anunțului:', error);
-    return { 
-      success: false, 
-      error: 'A apărut o eroare la ștergerea anunțului' 
-    };
+    console.error('Error deleting listing:', error);
+    return { success: false, error: 'Nu s-a putut șterge anunțul' };
   }
 }
 
-// Rate limiting pentru publicarea anunțurilor (folosește implementarea din repo)
 export async function checkRateLimit(userId: string): Promise<{ allowed: boolean; remaining: number }> {
   try {
-    console.log('Mock Admin: Verificare rate limit pentru', userId);
+    console.log('Firebase Admin: Check rate limit for', userId);
     
-    // TODO: Implementează logica reală când Firebase va fi activat
-    // Pentru mock, simulăm că utilizatorul poate publica
-    return {
-      allowed: true,
-      remaining: 3
-    };
-  } catch (error) {
-    console.error('Eroare la verificarea rate limit:', error);
-    // În caz de eroare, permitem publicarea
+    // TODO: Implement proper rate limiting with Firestore
+    // For now, allow 3 listings per hour
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+    
+    // This would need a proper implementation with Firestore queries
+    // For now, return a mock response
     return { allowed: true, remaining: 3 };
+  } catch (error) {
+    console.error('Error checking rate limit:', error);
+    return { allowed: false, remaining: 0 };
   }
 }
 
-// Funcție pentru a seta un utilizator ca admin (pentru seed/setup)
 export async function setUserAsAdmin(userId: string, currentAdminId: string) {
   try {
-    console.log('Mock Admin: Setare utilizator ca admin', userId, 'de către', currentAdminId);
+    console.log(`Firebase Admin: Set user ${userId} as admin by ${currentAdminId}`);
     
-    // TODO: Implementează logica reală când Firebase va fi activat
-    await new Promise(resolve => setTimeout(resolve, 500));
-
+    // Verify current user is admin
+    if (!await verifyAdmin(currentAdminId)) {
+      return { success: false, error: 'Acces neautorizat' };
+    }
+    
+    await setFirebaseUserAsAdmin(userId);
+    
+    // Log the admin promotion
+    await updateDoc(doc(db, 'users', userId), {
+      promotedBy: currentAdminId,
+      promotedAt: serverTimestamp()
+    });
+    
     return { success: true };
   } catch (error) {
-    console.error('Eroare la setarea admin:', error);
-    return { 
-      success: false, 
-      error: 'A apărut o eroare la setarea utilizatorului ca admin' 
-    };
+    console.error('Error setting user as admin:', error);
+    return { success: false, error: 'Nu s-a putut seta utilizatorul ca admin' };
   }
 }
+
+// Additional admin functions
+export async function getUserStats() {
+  try {
+    console.log('Firebase Admin: Getting user statistics');
+    
+    // TODO: Implement proper user statistics from Firestore
+    // This would involve aggregation queries
+    
+    return {
+      success: true,
+      stats: {
+        totalUsers: 0, // TODO: Count from users collection
+        activeUsers: 0, // TODO: Count active users
+        newUsersToday: 0, // TODO: Count users created today
+        adminUsers: 0 // TODO: Count admin users
+      }
+    };
+  } catch (error) {
+    console.error('Error getting user stats:', error);
+    return { success: false, error: 'Nu s-au putut încărca statisticile' };
+  }
+}
+
+export async function getListingStats() {
+  try {
+    console.log('Firebase Admin: Getting listing statistics');
+    
+    // TODO: Implement proper listing statistics from Firestore
+    // This would involve aggregation queries
+    
+    return {
+      success: true,
+      stats: {
+        totalListings: 0, // TODO: Count from listings collection
+        activeListings: 0, // TODO: Count active listings
+        hiddenListings: 0, // TODO: Count hidden listings
+        reportedListings: 0 // TODO: Count reported listings
+      }
+    };
+  } catch (error) {
+    console.error('Error getting listing stats:', error);
+    return { success: false, error: 'Nu s-au putut încărca statisticile' };
+  }
+};

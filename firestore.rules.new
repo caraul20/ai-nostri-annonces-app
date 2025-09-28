@@ -1,0 +1,98 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Users collection
+    match /users/{userId} {
+      // Users can read and write their own profile
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Admins can read all user profiles
+      allow read: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      // Only admins can promote users to admin
+      allow update: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' &&
+        request.data.role == 'admin';
+    }
+    
+    // Categories collection
+    match /categories/{categoryId} {
+      // Anyone can read active categories
+      allow read: if resource.data.isActive == true;
+      // Only admins can write categories
+      allow write: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // Locations collection
+    match /locations/{locationId} {
+      // Anyone can read active locations
+      allow read: if resource.data.isActive == true;
+      // Only admins can write locations
+      allow write: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // Listings collection
+    match /listings/{listingId} {
+      // Anyone can read active listings
+      allow read: if resource.data.status == 'active';
+      // Authenticated users can read all listings (for their own listings page)
+      allow read: if request.auth != null;
+      // Users can create listings
+      allow create: if request.auth != null && 
+        request.auth.uid == request.data.userId &&
+        request.data.status == 'active';
+      // Users can update their own listings
+      allow update: if request.auth != null && 
+        request.auth.uid == resource.data.userId;
+      // Users can delete their own listings (soft delete)
+      allow delete: if request.auth != null && 
+        request.auth.uid == resource.data.userId;
+      // Admins can read, update, and delete any listing
+      allow read, write: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // Reports collection (for reporting inappropriate content)
+    match /reports/{reportId} {
+      // Users can create reports
+      allow create: if request.auth != null && 
+        request.auth.uid == request.data.reportedBy;
+      // Only admins can read reports
+      allow read: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      // Only admins can update/delete reports
+      allow update, delete: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // Messages collection (for user communication)
+    match /messages/{messageId} {
+      // Users can read messages where they are sender or recipient
+      allow read: if request.auth != null && 
+        (request.auth.uid == resource.data.senderId || 
+         request.auth.uid == resource.data.recipientId);
+      // Users can create messages where they are the sender
+      allow create: if request.auth != null && 
+        request.auth.uid == request.data.senderId;
+      // Users can update their own messages (mark as read, etc.)
+      allow update: if request.auth != null && 
+        (request.auth.uid == resource.data.senderId || 
+         request.auth.uid == resource.data.recipientId);
+    }
+    
+    // Favorites collection
+    match /favorites/{favoriteId} {
+      // Users can manage their own favorites
+      allow read, write: if request.auth != null && 
+        request.auth.uid == resource.data.userId;
+    }
+    
+    // Analytics collection (admin only)
+    match /analytics/{document=**} {
+      allow read, write: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+  }
+}

@@ -10,7 +10,7 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children, requireAdmin = false }: ProtectedRouteProps) {
-  const { user, userData, loading } = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -20,12 +20,12 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Prote
         return;
       }
       
-      if (requireAdmin && userData?.role !== 'admin') {
+      if (requireAdmin && user?.role !== 'admin') {
         router.push('/');
         return;
       }
     }
-  }, [user, userData, loading, router, requireAdmin]);
+  }, [user, loading, router, requireAdmin]);
 
   if (loading) {
     return (
@@ -38,7 +38,7 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Prote
     );
   }
 
-  if (!user || (requireAdmin && userData?.role !== 'admin')) {
+  if (!user || (requireAdmin && user?.role !== 'admin')) {
     return null;
   }
 

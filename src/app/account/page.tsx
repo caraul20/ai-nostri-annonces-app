@@ -1,77 +1,42 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { User, Mail, Phone, Calendar, Shield, Edit2, Save, X } from 'lucide-react';
+import { User, Shield, Edit2, LogOut } from 'lucide-react';
+import Link from 'next/link';
+import KpiCards from '@/components/account/KpiCards';
+import Tabs from '@/components/account/Tabs';
+import MyListingsTable from '@/components/account/MyListingsTable';
+import ChatInbox from '@/components/account/ChatInbox';
+import FavoritesGrid from '@/components/account/FavoritesGrid';
+import AccountSidebar from '@/components/account/AccountSidebar';
+import { useUserListings } from '@/hooks/useUserListings';
+import { useChatInbox } from '@/hooks/useChatInbox';
+import { useFavorites } from '@/hooks/useFavorites';
 
-export default function AccountPage() {
+function AccountContent() {
   const router = useRouter();
-  const { user, userData, loading, updateUserProfile, logout } = useAuth();
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const searchParams = useSearchParams();
+  const { user, loading, logout } = useAuth();
+  const activeTab = searchParams.get('tab') || 'anunturi';
   
-  const [formData, setFormData] = useState({
-    name: '',
-    phone: ''
-  });
+  const { listings, loading: listingsLoading, stats } = useUserListings(user?.id);
+  const { chats, unreadTotal } = useChatInbox(user?.id);
+  const { favorites, count: favoritesCount } = useFavorites(user?.id);
 
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login');
-    }
-  }, [user, loading, router]);
-
-  useEffect(() => {
-    if (userData) {
-      setFormData({
-        name: userData.name || '',
-        phone: userData.phone || ''
-      });
-    }
-  }, [userData]);
-
-  const handleSave = async () => {
-    setSaving(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      await updateUserProfile({
-        name: formData.name,
-        phone: formData.phone
-      });
-      setSuccess('Profilul a fost actualizat cu succes!');
-      setEditing(false);
-    } catch (error: any) {
-      console.error('Eroare la actualizarea profilului:', error);
-      setError('A apărut o eroare la actualizarea profilului');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleCancel = () => {
-    if (userData) {
-      setFormData({
-        name: userData.name || '',
-        phone: userData.phone || ''
-      });
-    }
-    setEditing(false);
-    setError('');
-    setSuccess('');
-  };
+  // Redirect admin users
+  if (!loading && user?.role === 'admin') {
+    router.push('/admin');
+    return null;
+  }
 
   const handleLogout = async () => {
     try {
       await logout();
       router.push('/');
     } catch (error) {
-      console.error('Eroare la deconectare:', error);
+      console.error('Error logging out:', error);
     }
   };
 
@@ -86,201 +51,151 @@ export default function AccountPage() {
     );
   }
 
-  if (!user || !userData) {
+  if (!user) {
+    router.push('/login');
     return null;
   }
 
-  const formatDate = (date: any) => {
-    if (!date) return '';
-    
-    let dateObj: Date;
-    if (date.toDate) {
-      dateObj = date.toDate();
-    } else if (date instanceof Date) {
-      dateObj = date;
-    } else {
-      return '';
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'mesaje':
+        return <ChatInbox chats={chats} />;
+      case 'favorite':
+        return <FavoritesGrid favorites={favorites} />;
+      case 'setari':
+        return (
+          <div className="card space-y-4">
+            <h3 className="text-lg font-semibold">Setări Cont</h3>
+            <div className="space-y-3">
+              <Link href="/account/edit" className="block p-3 border rounded-xl hover:bg-gray-50">
+                <div className="font-medium">Editează Profilul</div>
+                <div className="text-sm text-gray-600">Actualizează informațiile personale</div>
+              </Link>
+              <Link href="/account/notifications" className="block p-3 border rounded-xl hover:bg-gray-50">
+                <div className="font-medium">Notificări</div>
+                <div className="text-sm text-gray-600">Gestionează preferințele de notificare</div>
+              </Link>
+              <Link href="/account/security" className="block p-3 border rounded-xl hover:bg-gray-50">
+                <div className="font-medium">Securitate & 2FA</div>
+                <div className="text-sm text-gray-600">Parole și autentificare în doi pași</div>
+              </Link>
+            </div>
+          </div>
+        );
+      default:
+        return <MyListingsTable listings={listings} loading={listingsLoading} />;
     }
-    
-    return new Intl.DateTimeFormat('ro-RO', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    }).format(dateObj);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="container mx-auto px-4 max-w-2xl">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Contul meu</h1>
-          <p className="text-gray-600">Gestionează informațiile tale personale</p>
+    <div className="min-h-screen bg-gray-50">
+      {/* Mobile Header */}
+      <div className="lg:hidden bg-white border-b px-4 py-3">
+        <div className="flex items-center justify-between">
+          <Link href="/" className="text-sm text-gray-600 hover:text-gray-900">
+            ← Înapoi
+          </Link>
+          <button
+            onClick={handleLogout}
+            className="text-sm text-red-600 hover:text-red-700"
+            aria-label="Deconectare"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
         </div>
+      </div>
 
-        {/* Mesaje de succes/eroare */}
-        {success && (
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <p className="text-green-700">{success}</p>
-          </div>
-        )}
-
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-700">{error}</p>
-          </div>
-        )}
-
-        {/* Card profil */}
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-          {/* Header card */}
-          <div className="bg-gradient-to-r from-green-600 to-yellow-500 px-6 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 lg:py-8">
+        {/* Header Card */}
+        <div className="card mb-6">
+          <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center text-green-600 text-2xl font-bold">
-                {userData.name?.charAt(0)?.toUpperCase() || user.email?.charAt(0)?.toUpperCase()}
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                {user.photoURL ? (
+                  <img 
+                    src={user.photoURL} 
+                    alt={user.name || 'Avatar'} 
+                    className="w-12 h-12 rounded-full object-cover"
+                  />
+                ) : (
+                  <User className="h-6 w-6 text-green-600" aria-hidden="true" />
+                )}
               </div>
-              <div className="text-white">
-                <h2 className="text-2xl font-bold">{userData.name || 'Utilizator'}</h2>
-                <p className="text-green-100">{user.email}</p>
-                {userData.role === 'admin' && (
-                  <span className="inline-block mt-2 px-3 py-1 bg-red-500 text-white text-sm rounded-full">
-                    <Shield className="inline h-4 w-4 mr-1" />
-                    Administrator
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">
+                  {user.name || 'Utilizator'}
+                </h1>
+                <p className="text-sm text-gray-600">{user.email}</p>
+                <div className="flex items-center mt-1">
+                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                    user.role === 'admin' 
+                      ? 'bg-purple-100 text-purple-800' 
+                      : 'bg-gray-100 text-gray-800'
+                  }`}>
+                    {user.role === 'admin' ? 'Administrator' : 'Utilizator'}
                   </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Conținut card */}
-          <div className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900">Informații personale</h3>
-              {!editing ? (
-                <Button
-                  onClick={() => setEditing(true)}
-                  variant="outline"
-                  size="sm"
-                >
-                  <Edit2 className="h-4 w-4 mr-2" />
-                  Editează
-                </Button>
-              ) : (
-                <div className="flex space-x-2">
-                  <Button
-                    onClick={handleSave}
-                    disabled={saving}
-                    size="sm"
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    <Save className="h-4 w-4 mr-2" />
-                    {saving ? 'Se salvează...' : 'Salvează'}
-                  </Button>
-                  <Button
-                    onClick={handleCancel}
-                    variant="outline"
-                    size="sm"
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Anulează
-                  </Button>
                 </div>
-              )}
-            </div>
-
-            <div className="space-y-6">
-              {/* Nume */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <User className="inline h-4 w-4 mr-1" />
-                  Nume complet
-                </label>
-                {editing ? (
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                    placeholder="Numele tău complet"
-                  />
-                ) : (
-                  <p className="text-gray-900 py-2">{userData.name || 'Nu este specificat'}</p>
-                )}
-              </div>
-
-              {/* Email */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <Mail className="inline h-4 w-4 mr-1" />
-                  Adresa de email
-                </label>
-                <p className="text-gray-900 py-2">{user.email}</p>
-                <p className="text-xs text-gray-500">Email-ul nu poate fi modificat</p>
-              </div>
-
-              {/* Telefon */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <Phone className="inline h-4 w-4 mr-1" />
-                  Număr de telefon
-                </label>
-                {editing ? (
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                    placeholder="Ex: 0712345678"
-                  />
-                ) : (
-                  <p className="text-gray-900 py-2">{userData.phone || 'Nu este specificat'}</p>
-                )}
-              </div>
-
-              {/* Data înregistrării */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <Calendar className="inline h-4 w-4 mr-1" />
-                  Membru din
-                </label>
-                <p className="text-gray-900 py-2">{formatDate(userData.createdAt)}</p>
               </div>
             </div>
-          </div>
-
-          {/* Footer card */}
-          <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
-            <div className="flex justify-between items-center">
-              <div className="text-sm text-gray-500">
-                Contul tău este securizat și protejat
-              </div>
-              <Button
+            <div className="hidden lg:flex items-center space-x-3">
+              <Link href="/account/edit">
+                <button className="btn-secondary">
+                  <Edit2 className="h-4 w-4 mr-2" aria-hidden="true" />
+                  Editează profil
+                </button>
+              </Link>
+              <Link href="/">
+                <button className="btn-secondary">
+                  Înapoi la Site
+                </button>
+              </Link>
+              <button
                 onClick={handleLogout}
-                variant="outline"
-                className="text-red-600 border-red-300 hover:bg-red-50"
+                className="btn-secondary text-red-600 hover:text-red-700"
+                aria-label="Deconectare"
               >
-                Deconectează-te
-              </Button>
+                <LogOut className="h-4 w-4 mr-2" aria-hidden="true" />
+                Deconectare
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Statistici rapide */}
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white rounded-lg shadow p-6 text-center">
-            <div className="text-2xl font-bold text-green-600">0</div>
-            <div className="text-sm text-gray-600">Anunțuri publicate</div>
+        {/* KPI Cards */}
+        <KpiCards 
+          activeCount={stats.activeCount}
+          viewsTotal={stats.viewsTotal}
+          messagesTotal={unreadTotal}
+          favoritesCount={favoritesCount}
+        />
+
+        {/* Main Content */}
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_320px] gap-6">
+          {/* Left Column - Tabs & Content */}
+          <div className="space-y-6">
+            <Tabs activeTab={activeTab} unreadCount={unreadTotal} />
+            {renderTabContent()}
           </div>
-          <div className="bg-white rounded-lg shadow p-6 text-center">
-            <div className="text-2xl font-bold text-yellow-600">0</div>
-            <div className="text-sm text-gray-600">Anunțuri active</div>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6 text-center">
-            <div className="text-2xl font-bold text-orange-600">0</div>
-            <div className="text-sm text-gray-600">Vizualizări totale</div>
-          </div>
+
+          {/* Right Column - Sidebar */}
+          <AccountSidebar user={user} />
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AccountPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-48 mb-4"></div>
+          <div className="h-4 bg-gray-200 rounded w-32"></div>
+        </div>
+      </div>
+    }>
+      <AccountContent />
+    </Suspense>
   );
 }

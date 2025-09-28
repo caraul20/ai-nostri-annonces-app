@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { Mail, Lock, User, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { signIn, signUp, signInWithGoogle } = useAuth();
+  const { user, loading: authLoading, login, register, loginWithGoogle } = useAuth();
   
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
@@ -23,6 +23,34 @@ export default function LoginPage() {
     confirmPassword: ''
   });
 
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (!authLoading && user) {
+      console.log('User detected, redirecting...', user);
+      if (user.role === 'admin') {
+        console.log('Redirecting admin to /admin');
+        router.push('/admin');
+      } else {
+        console.log('Redirecting user to /account');
+        router.push('/account');
+      }
+    }
+  }, [user, authLoading, router]);
+
+  // Show loading if auth is loading or user is authenticated (redirecting)
+  if (authLoading || user) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">
+            {user ? 'Redirecționare...' : 'Se încarcă...'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -30,7 +58,7 @@ export default function LoginPage() {
 
     try {
       if (isLogin) {
-        await signIn(formData.email, formData.password);
+        await login(formData.email, formData.password);
       } else {
         if (formData.password !== formData.confirmPassword) {
           throw new Error('Parolele nu se potrivesc');
@@ -38,10 +66,13 @@ export default function LoginPage() {
         if (formData.password.length < 6) {
           throw new Error('Parola trebuie să aibă cel puțin 6 caractere');
         }
-        await signUp(formData.email, formData.password, formData.name);
+        await register(formData.email, formData.password, formData.name);
       }
       
-      router.push('/account');
+      // Redirect will be handled by AuthContext after user data is loaded
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     } catch (error: any) {
       console.error('Eroare autentificare:', error);
       setError(getErrorMessage(error));
@@ -55,8 +86,11 @@ export default function LoginPage() {
     setError('');
 
     try {
-      await signInWithGoogle();
-      router.push('/account');
+      await loginWithGoogle();
+      // Redirect will be handled by AuthContext after user data is loaded
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     } catch (error: any) {
       console.error('Eroare Google Sign-In:', error);
       setError(getErrorMessage(error));
