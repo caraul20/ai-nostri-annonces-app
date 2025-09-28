@@ -26,7 +26,7 @@ interface EnrichedListing extends Listing {
 }
 
 export default function ModerationPage() {
-  const { userData } = useAuth();
+  const { user } = useAuth();
   const [listings, setListings] = useState<EnrichedListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
