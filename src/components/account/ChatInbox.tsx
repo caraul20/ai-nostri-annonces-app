@@ -1,24 +1,9 @@
 import { MessageCircle, User } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-
-interface Chat {
-  id: string;
-  participants: string[];
-  lastMessage: {
-    text: string;
-    senderId: string;
-    timestamp: Date;
-  };
-  unreadCount: number;
-  otherUser: {
-    id: string;
-    name: string;
-    photoURL?: string;
-  };
-}
+import { ChatWithDetails } from '@/server/repo/messages';
 
 interface ChatInboxProps {
-  chats: Chat[];
+  chats: ChatWithDetails[];
 }
 
 export default function ChatInbox({ chats }: ChatInboxProps) {
@@ -70,10 +55,10 @@ export default function ChatInbox({ chats }: ChatInboxProps) {
       </div>
 
       <div className="space-y-3">
-        {chats.map((chat) => (
+        {chats.filter(chat => chat.id).map((chat) => (
           <div 
             key={chat.id}
-            onClick={() => handleChatClick(chat.id)}
+            onClick={() => handleChatClick(chat.id!)}
             className="flex items-center space-x-3 p-3 rounded-xl hover:bg-gray-50 cursor-pointer transition-colors"
             role="button"
             tabIndex={0}
@@ -81,7 +66,7 @@ export default function ChatInbox({ chats }: ChatInboxProps) {
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                handleChatClick(chat.id);
+                handleChatClick(chat.id!);
               }
             }}
           >
@@ -105,9 +90,11 @@ export default function ChatInbox({ chats }: ChatInboxProps) {
                   {chat.otherUser.name}
                 </h3>
                 <div className="flex items-center space-x-2">
-                  <span className="text-xs text-gray-500">
-                    {formatTimeAgo(chat.lastMessage.timestamp)}
-                  </span>
+                  {chat.lastMessage && (
+                    <span className="text-xs text-gray-500">
+                      {formatTimeAgo(chat.lastMessage.timestamp)}
+                    </span>
+                  )}
                   {chat.unreadCount > 0 && (
                     <span 
                       className="bg-green-500 text-white text-xs rounded-full px-2 py-0.5 min-w-[20px] text-center"
@@ -119,7 +106,7 @@ export default function ChatInbox({ chats }: ChatInboxProps) {
                 </div>
               </div>
               <p className="text-sm text-gray-600 line-clamp-2">
-                {chat.lastMessage.text}
+                {chat.lastMessage?.text || 'Fără mesaje'}
               </p>
             </div>
           </div>
