@@ -18,7 +18,7 @@ import {
   XCircle
 } from 'lucide-react';
 import { getListings, toggleListingStatus, deleteListingAdmin } from '@/app/actions/admin';
-import { Listing, getCategoryById, getLocationById } from '@/lib/firestore';
+import { Listing, getCategoryById, getLocationById } from '@/server/repo/repoFirebase';
 
 interface EnrichedListing extends Listing {
   categoryName?: string;
