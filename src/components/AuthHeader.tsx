@@ -7,7 +7,7 @@ import { User, LogOut, Settings } from 'lucide-react';
 import { useState } from 'react';
 
 export default function AuthHeader() {
-  const { user, userData, logout } = useAuth();
+  const { user, logout } = useAuth();
   const [showDropdown, setShowDropdown] = useState(false);
 
   const handleLogout = async () => {
@@ -41,10 +41,10 @@ export default function AuthHeader() {
         className="flex items-center space-x-2 text-gray-700 hover:text-green-600 px-3 py-2 rounded-xl transition-all duration-200"
       >
         <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
-          {userData?.name?.charAt(0)?.toUpperCase() || user.email?.charAt(0)?.toUpperCase()}
+          {user?.name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase()}
         </div>
         <span className="hidden sm:inline font-medium">
-          {userData?.name || user.displayName || 'Utilizator'}
+          {user?.name || 'Utilizator'}
         </span>
       </button>
 
@@ -52,10 +52,10 @@ export default function AuthHeader() {
         <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
           <div className="px-4 py-2 border-b border-gray-100">
             <p className="text-sm font-medium text-gray-900">
-              {userData?.name || user.displayName}
+              {user?.name || 'Utilizator'}
             </p>
-            <p className="text-xs text-gray-500">{user.email}</p>
-            {userData?.role === 'admin' && (
+            <p className="text-xs text-gray-500">{user?.email}</p>
+            {user?.role === 'admin' && (
               <span className="inline-block mt-1 px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">
                 Admin
               </span>
@@ -69,7 +69,7 @@ export default function AuthHeader() {
             </div>
           </Link>
           
-          {userData?.role === 'admin' && (
+          {user?.role === 'admin' && (
             <Link href="/admin/moderation" onClick={() => setShowDropdown(false)}>
               <div className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                 <Settings className="h-4 w-4 mr-2" />
