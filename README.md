@@ -1,6 +1,6 @@
 # 🏠 Ai Nostri - Platformă pentru Diaspora Românească din Franța
 
-> **Platformă de anunțuri 100% MOCK** - Rulează fără Firebase/Algolia în dezvoltare
+> **Platformă de anunțuri pentru diaspora românească** - Configurată cu Firebase și optimizată pentru producție
 
 ## 🎯 **Context și Public Țintă**
 
@@ -562,4 +562,4 @@ Acest proiect este licențiat sub MIT License - vezi fișierul [LICENSE](LICENSE
 
 ---
 
-**Ai Nostri** - Platforma de anunțuri clasificate care conectează oamenii! 🏠🚗📱
+**# Ai Nostri - Platforma de Anunțuri clasificate care conectează oamenii! 🏠🚗📱
