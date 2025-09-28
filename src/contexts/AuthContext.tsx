@@ -19,6 +19,7 @@ interface User {
   email: string;
   name?: string;
   phone?: string;
+  bio?: string;
   role?: 'user' | 'admin';
   photoURL?: string;
   createdAt?: Date;
@@ -52,6 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             email: firebaseUser.email || '',
             name: userData.name || firebaseUser.displayName || '',
             phone: userData.phone || '',
+            bio: userData.bio || '',
             role: userData.role || 'user',
             photoURL: firebaseUser.photoURL || undefined,
             createdAt: userData.createdAt?.toDate() || new Date()
@@ -100,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setLoading(true);
       const result = await signInWithEmailAndPassword(auth, email, password);
-      await createUserProfile(result.user);
+      await createUserProfile(result.user, { bio: '' });
     } catch (error: any) {
       console.error('Login error:', error);
       throw new Error(getAuthErrorMessage(error.code));
@@ -113,7 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setLoading(true);
       const result = await signInWithPopup(auth, googleProvider);
-      await createUserProfile(result.user);
+      await createUserProfile(result.user, { bio: '' });
     } catch (error: any) {
       console.error('Google login error:', error);
       throw new Error(getAuthErrorMessage(error.code));
@@ -133,7 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       
       // Create user profile in Firestore
-      await createUserProfile(result.user, { name });
+      await createUserProfile(result.user, { name, bio: '' });
     } catch (error: any) {
       console.error('Registration error:', error);
       throw new Error(getAuthErrorMessage(error.code));
