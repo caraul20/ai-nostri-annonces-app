@@ -1,7 +1,8 @@
 import { Metadata } from 'next';
-import { getListings, getCategories, getLocations, getCategoryById, getLocationById } from '@/server/repo/repoMock';
+import { getListings, getCategories, getLocations, getCategoryById, getLocationById } from '@/server/repo/repoFirebase';
 import AdCard from '@/components/AdCard';
 import { Button } from '@/components/ui/button';
+import SearchFilters from '@/components/SearchFilters';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Plus, Package, ArrowRight } from 'lucide-react';
@@ -54,9 +55,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   };
 
   // Charger les données en parallèle
-  const [listingsResult, categories] = await Promise.all([
+  const [listingsResult, categories, locations] = await Promise.all([
     getListings(filters),
     getCategories(),
+    getLocations(),
   ]);
 
   // Enrichir les listings avec les données de catégorie et localisation
@@ -66,7 +68,78 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         getCategoryById(listing.categoryId),
         getLocationById(listing.locationId),
       ]);
-      return { listing, category, location };
+      
+      // Helper function to safely convert dates
+      const safeToISOString = (date: any): string | null => {
+        if (!date || date === null || date === undefined) return null;
+        
+        try {
+          // If it's already a Date object
+          if (date instanceof Date) {
+            return date.toISOString();
+          }
+          
+          // If it's a Firestore Timestamp
+          if (date.toDate && typeof date.toDate === 'function') {
+            return date.toDate().toISOString();
+          }
+          
+          // If it's a string or number, try to create a Date
+          const dateObj = new Date(date);
+          if (isNaN(dateObj.getTime())) {
+            return null; // Invalid date
+          }
+          
+          return dateObj.toISOString();
+        } catch (error) {
+          console.warn('Error converting date:', date, error);
+          return null;
+        }
+      };
+      
+      // Serialize listing data for client component
+      const serializedListing = {
+        id: listing.id,
+        title: listing.title,
+        description: listing.description,
+        price: listing.price,
+        images: listing.images,
+        categoryId: listing.categoryId,
+        locationId: listing.locationId,
+        userId: listing.userId,
+        status: listing.status,
+        slug: listing.slug,
+        createdAt: safeToISOString(listing.createdAt),
+        updatedAt: safeToISOString(listing.updatedAt),
+        views: listing.views || 0,
+        featured: listing.featured || false,
+        expiresAt: safeToISOString(listing.expiresAt)
+      };
+      
+      // Serialize category data
+      const serializedCategory = category ? {
+        id: category.id,
+        name: category.name,
+        slug: category.slug,
+        description: category.description,
+        isActive: category.isActive,
+        order: category.order
+      } : null;
+      
+      // Serialize location data
+      const serializedLocation = location ? {
+        id: location.id,
+        name: location.name,
+        slug: location.slug,
+        isActive: location.isActive,
+        order: location.order
+      } : null;
+      
+      return { 
+        listing: serializedListing, 
+        category: serializedCategory, 
+        location: serializedLocation 
+      };
     })
   );
 
@@ -116,6 +189,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </div>
       </section>
 
+      {/* Search Filters - Elegant Integration */}
+      <SearchFilters categories={categories} locations={locations} />
+
       {/* Secțiunea de anunțuri - layout compact */}
       <section className="py-16 bg-white">
         <div className="container mx-auto px-4">
@@ -148,11 +224,11 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               </div>
 
               {/* Paginare */}
-              {listingsResult.totalPages > 1 && (
+              {(filters.page > 1 || listingsResult.hasMore) && (
                 <div className="mt-12 flex justify-center items-center space-x-4">
-                  {listingsResult.page > 1 && (
+                  {filters.page > 1 && (
                     <Link 
-                      href={`/?${new URLSearchParams({...sp, page: (listingsResult.page - 1).toString()}).toString()}`}
+                      href={`/?${new URLSearchParams({...sp, page: (filters.page - 1).toString()}).toString()}`}
                       className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
                     >
                       ← Precedenta
@@ -160,12 +236,12 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                   )}
                   
                   <span className="text-gray-600">
-                    Pagina {listingsResult.page} din {listingsResult.totalPages}
+                    Pagina {filters.page} • {listingsResult.total} anunțuri
                   </span>
                   
-                  {listingsResult.page < listingsResult.totalPages && (
+                  {listingsResult.hasMore && (
                     <Link 
-                      href={`/?${new URLSearchParams({...sp, page: (listingsResult.page + 1).toString()}).toString()}`}
+                      href={`/?${new URLSearchParams({...sp, page: (filters.page + 1).toString()}).toString()}`}
                       className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                     >
                       Următoarea →

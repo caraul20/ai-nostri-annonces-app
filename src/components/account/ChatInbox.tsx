@@ -61,6 +61,12 @@ export default function ChatInbox({ chats }: ChatInboxProps) {
         <h2 className="text-lg font-semibold text-gray-900">
           Mesaje ({chats.length})
         </h2>
+        <button
+          onClick={() => router.push('/messages')}
+          className="btn-secondary text-sm"
+        >
+          Vezi toate
+        </button>
       </div>
 
       <div className="space-y-3">

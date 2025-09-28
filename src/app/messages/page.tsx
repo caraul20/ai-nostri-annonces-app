@@ -1,19 +1,61 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { MessageCircle, ArrowLeft, Send, User, Search } from 'lucide-react';
 import { useChatInbox } from '@/hooks/useChatInbox';
+import { sendMessage, getChatMessages, markMessagesAsRead, Message } from '@/server/repo/messages';
 import Link from 'next/link';
 
 export default function MessagesPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, loading } = useAuth();
   const { chats, unreadTotal } = useChatInbox(user?.id);
   const [selectedChat, setSelectedChat] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [messageText, setMessageText] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
+  
+  // Set selected chat from URL params
+  useEffect(() => {
+    const chatId = searchParams.get('chat');
+    if (chatId) {
+      setSelectedChat(chatId);
+    }
+  }, [searchParams]);
+  
+  // Fetch messages for selected chat
+  useEffect(() => {
+    if (!selectedChat) {
+      setMessages([]);
+      return;
+    }
+    
+    const fetchMessages = async () => {
+      try {
+        const chatMessages = await getChatMessages(selectedChat);
+        setMessages(chatMessages);
+        
+        // Mark messages as read
+        if (user?.id) {
+          await markMessagesAsRead(selectedChat, user.id);
+        }
+      } catch (error) {
+        console.error('Error fetching messages:', error);
+        setMessages([]);
+      }
+    };
+    
+    fetchMessages();
+    
+    // Refresh messages every 5 seconds
+    const interval = setInterval(fetchMessages, 5000);
+    
+    return () => clearInterval(interval);
+  }, [selectedChat, user?.id]);
 
   const formatTimeAgo = (date: Date) => {
     const now = new Date();
@@ -27,18 +69,36 @@ export default function MessagesPage() {
 
   const filteredChats = chats.filter(chat =>
     chat.otherUser.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    chat.lastMessage.text.toLowerCase().includes(searchTerm.toLowerCase())
+    (chat.lastMessage?.text || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const selectedChatData = chats.find(chat => chat.id === selectedChat);
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!messageText.trim()) return;
+    if (!messageText.trim() || !selectedChat || !user) return;
     
-    // TODO: Implement real message sending
-    console.log('Sending message:', messageText);
-    setMessageText('');
+    const selectedChatData = chats.find(chat => chat.id === selectedChat);
+    if (!selectedChatData) return;
+    
+    const receiverId = selectedChatData.participants.find(id => id !== user.id);
+    if (!receiverId) return;
+    
+    setSendingMessage(true);
+    
+    try {
+      await sendMessage(selectedChat, user.id, receiverId, messageText.trim());
+      setMessageText('');
+      
+      // Refresh messages immediately after sending
+      const updatedMessages = await getChatMessages(selectedChat);
+      setMessages(updatedMessages);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      alert('Eroare la trimiterea mesajului. Încearcă din nou.');
+    } finally {
+      setSendingMessage(false);
+    }
   };
 
   if (loading) {
@@ -123,7 +183,7 @@ export default function MessagesPage() {
                   {filteredChats.map((chat) => (
                     <button
                       key={chat.id}
-                      onClick={() => setSelectedChat(chat.id)}
+                      onClick={() => setSelectedChat(chat.id || null)}
                       className={`w-full p-4 text-left hover:bg-gray-50 transition-colors ${
                         selectedChat === chat.id ? 'bg-green-50 border-r-2 border-green-500' : ''
                       }`}
@@ -148,7 +208,7 @@ export default function MessagesPage() {
                             </h3>
                             <div className="flex items-center space-x-2">
                               <span className="text-xs text-gray-500">
-                                {formatTimeAgo(chat.lastMessage.timestamp)}
+                                {chat.lastMessage ? formatTimeAgo(chat.lastMessage.timestamp) : ''}
                               </span>
                               {chat.unreadCount > 0 && (
                                 <span className="bg-green-500 text-white text-xs rounded-full px-2 py-0.5 min-w-[20px] text-center">
@@ -158,7 +218,7 @@ export default function MessagesPage() {
                             </div>
                           </div>
                           <p className="text-sm text-gray-600 line-clamp-2">
-                            {chat.lastMessage.text}
+                            {chat.lastMessage?.text || 'Niciun mesaj încă'}
                           </p>
                         </div>
                       </div>
@@ -205,28 +265,30 @@ export default function MessagesPage() {
                 {/* Messages Area */}
                 <div className="flex-1 p-4 overflow-y-auto bg-gray-50">
                   <div className="space-y-4">
-                    {/* Sample messages */}
-                    <div className="flex justify-start">
-                      <div className="max-w-xs lg:max-w-md">
-                        <div className="bg-white rounded-2xl px-4 py-2 shadow-sm">
-                          <p className="text-sm">{selectedChatData.lastMessage.text}</p>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1 px-2">
-                          {formatTimeAgo(selectedChatData.lastMessage.timestamp)}
-                        </p>
+                    {messages.length === 0 ? (
+                      <div className="text-center text-gray-500 py-8">
+                        <p>Niciun mesaj încă. Începe conversația!</p>
                       </div>
-                    </div>
-
-                    <div className="flex justify-end">
-                      <div className="max-w-xs lg:max-w-md">
-                        <div className="bg-green-600 text-white rounded-2xl px-4 py-2">
-                          <p className="text-sm">Mulțumesc pentru informații!</p>
+                    ) : (
+                      messages.map((message) => (
+                        <div key={message.id} className={`flex ${message.senderId === user?.id ? 'justify-end' : 'justify-start'}`}>
+                          <div className="max-w-xs lg:max-w-md">
+                            <div className={`rounded-2xl px-4 py-2 ${
+                              message.senderId === user?.id 
+                                ? 'bg-green-600 text-white' 
+                                : 'bg-white shadow-sm'
+                            }`}>
+                              <p className="text-sm">{message.text}</p>
+                            </div>
+                            <p className={`text-xs text-gray-500 mt-1 px-2 ${
+                              message.senderId === user?.id ? 'text-right' : ''
+                            }`}>
+                              {formatTimeAgo(message.timestamp)}
+                            </p>
+                          </div>
                         </div>
-                        <p className="text-xs text-gray-500 mt-1 px-2 text-right">
-                          Acum
-                        </p>
-                      </div>
-                    </div>
+                      ))
+                    )}
                   </div>
                 </div>
 
@@ -242,7 +304,7 @@ export default function MessagesPage() {
                     />
                     <button
                       type="submit"
-                      disabled={!messageText.trim()}
+                      disabled={!messageText.trim() || sendingMessage}
                       className="btn-primary px-4 py-2 disabled:opacity-50"
                     >
                       <Send className="h-4 w-4" />

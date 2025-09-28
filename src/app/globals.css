@@ -220,6 +220,13 @@ body {
   display: grid;
   gap: var(--spacing-lg);
   grid-template-columns: 1fr;
+  align-items: stretch; /* Face toate cardurile să aibă aceeași înălțime */
+}
+
+.grid-responsive > * {
+  display: flex;
+  flex-direction: column;
+  height: 100%; /* Asigură că fiecare card ocupă toată înălțimea disponibilă */
 }
 
 @media (min-width: 640px) {

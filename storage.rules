@@ -2,9 +2,17 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     
-    // Images folder - organized by type and user
-    match /images/{folder}/{userId}/{fileName} {
-      // Anyone can read images
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() &&
              firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
              firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
@@ -23,12 +31,26 @@ service firebase.storage {
       ];
     }
     
-    // Images pentru listings - structura: images/listings/{userId}/{listingId}/{imageId}
-    match /images/listings/{userId}/{listingId}/{imageId} {
+    // Images pentru listings - structura: images/listings/{userId}/{imageId}
+    match /images/listings/{userId}/{imageId} {
       // Read - toți pot vedea imaginile (pentru anunțuri publice)
       allow read: if true;
       
       // Write (create/update) - doar owner-ul sau admin
+      allow write: if (isOwner(userId) || isAdmin()) &&
+                      isValidImageFile() &&
+                      isValidImageFormat();
+      
+      // Delete - doar owner-ul sau admin
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+    
+    // Fallback pentru orice imagine în folderul images
+    match /images/{folder}/{userId}/{imageId} {
+      // Read - toți pot vedea imaginile
+      allow read: if true;
+      
+      // Write - doar owner-ul sau admin
       allow write: if (isOwner(userId) || isAdmin()) &&
                       isValidImageFile() &&
                       isValidImageFormat();

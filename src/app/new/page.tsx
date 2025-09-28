@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import ImageUploader from '@/components/ImageUploader';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { Camera, MapPin, Euro, FileText, Tag, AlertCircle } from 'lucide-react';
-import { getCategories, getLocations, Category, Location } from '@/server/repo/repoMock';
+import { getCategories, getLocations, Category, Location } from '@/server/repo/repoFirebase';
 import { createListing } from '@/app/actions/listings';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -52,7 +52,7 @@ export default function NewAdPage() {
 
     const formData = new FormData(event.currentTarget);
     formData.append('images', JSON.stringify(images));
-    formData.append('userId', user.uid);
+    formData.append('userId', user.id);
 
     try {
       const result = await createListing({}, formData);

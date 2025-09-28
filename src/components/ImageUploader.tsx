@@ -2,24 +2,23 @@ import { useState, useRef } from 'react';
 import { Upload, X, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { storage } from '@/lib/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface ImageUploaderProps {
+  images: string[];
   onImagesChange: (images: string[]) => void;
   maxImages?: number;
   disabled?: boolean;
   folder?: string;
 }
 
-export default function ImageUploaderFirebase({ 
+export default function ImageUploader({ 
+  images,
   onImagesChange, 
   maxImages = 5, 
   disabled = false,
   folder = 'listings'
 }: ImageUploaderProps) {
-  const [images, setImages] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -41,34 +40,37 @@ export default function ImageUploaderFirebase({
     return null;
   };
 
-  const uploadToFirebase = async (file: File): Promise<string> => {
-    if (!user) {
-      throw new Error('Trebuie să fii autentificat pentru a încărca imagini.');
-    }
-
-    // Create unique filename
-    const timestamp = Date.now();
-    const randomString = Math.random().toString(36).substring(2);
-    const fileExtension = file.name.split('.').pop();
-    const fileName = `${timestamp}_${randomString}.${fileExtension}`;
-    
-    // Create storage reference
-    const storageRef = ref(storage, `images/${folder}/${user.id}/${fileName}`);
-    
-    try {
-      // Upload file
-      const uploadResult = await uploadBytes(storageRef, file);
-      console.log('Firebase: Image uploaded successfully:', fileName);
+  const convertImageToBase64 = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
       
-      // Get download URL
-      const downloadURL = await getDownloadURL(uploadResult.ref);
-      console.log('Firebase: Download URL obtained:', downloadURL);
+      reader.onload = () => {
+        const result = reader.result as string;
+        // Compress image if too large (optional)
+        const img = new window.Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          
+          // Calculate new dimensions (max 800px width)
+          const maxWidth = 800;
+          const ratio = Math.min(maxWidth / img.width, maxWidth / img.height);
+          canvas.width = img.width * ratio;
+          canvas.height = img.height * ratio;
+          
+          // Draw and compress
+          ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
+          
+          console.log('Image converted to base64, size:', Math.round(compressedBase64.length / 1024), 'KB');
+          resolve(compressedBase64);
+        };
+        img.src = result;
+      };
       
-      return downloadURL;
-    } catch (error) {
-      console.error('Firebase: Error uploading image:', error);
-      throw error;
-    }
+      reader.onerror = () => reject(new Error('Eroare la citirea fișierului'));
+      reader.readAsDataURL(file);
+    });
   };
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -109,7 +111,7 @@ export default function ImageUploaderFirebase({
     const errors: string[] = [];
 
     try {
-      // Upload files one by one
+      // Convert files to base64 one by one
       for (let i = 0; i < validFiles.length; i++) {
         const file = validFiles[i];
         const fileKey = `${file.name}_${i}`;
@@ -117,29 +119,28 @@ export default function ImageUploaderFirebase({
         try {
           setUploadProgress(prev => ({ ...prev, [fileKey]: 0 }));
           
-          // Simulate progress (Firebase doesn't provide real-time progress for uploadBytes)
+          // Simulate progress for UX
           const progressInterval = setInterval(() => {
             setUploadProgress(prev => ({
-              ...prev,
-              [fileKey]: Math.min((prev[fileKey] || 0) + 10, 90)
+              ...prev, 
+              [fileKey]: Math.min((prev[fileKey] || 0) + 20, 90)
             }));
           }, 100);
           
-          const downloadURL = await uploadToFirebase(file);
+          const base64Image = await convertImageToBase64(file);
           
           clearInterval(progressInterval);
-          setUploadProgress(prev => ({ ...prev, [fileKey]: 100 }));
+          setUploadProgress((prev) => ({ ...prev, [fileKey]: 100 }));
           
-          newImageUrls.push(downloadURL);
+          newImageUrls.push(base64Image);
         } catch (error) {
-          console.error(`Error uploading ${file.name}:`, error);
-          errors.push(`Eroare la încărcarea ${file.name}`);
+          console.error(`Error converting ${file.name}:`, error);
+          errors.push(`Eroare la procesarea ${file.name}`);
         }
       }
 
       if (newImageUrls.length > 0) {
         const updatedImages = [...images, ...newImageUrls];
-        setImages(updatedImages);
         onImagesChange(updatedImages);
       }
 
@@ -158,23 +159,9 @@ export default function ImageUploaderFirebase({
     }
   };
 
-  const removeImage = async (index: number) => {
-    const imageUrl = images[index];
-    
-    try {
-      // Try to delete from Firebase Storage
-      if (imageUrl.includes('firebase')) {
-        const imageRef = ref(storage, imageUrl);
-        await deleteObject(imageRef);
-        console.log('Firebase: Image deleted from storage');
-      }
-    } catch (error) {
-      console.error('Error deleting image from storage:', error);
-      // Continue with removal from state even if storage deletion fails
-    }
-    
+  const removeImage = (index: number) => {
+    // Simply remove from array (no Firebase Storage deletion needed)
     const updatedImages = images.filter((_, i) => i !== index);
-    setImages(updatedImages);
     onImagesChange(updatedImages);
   };
 

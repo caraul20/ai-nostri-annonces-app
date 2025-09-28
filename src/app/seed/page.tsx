@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { addCategory, addLocation, getCategories, getLocations } from '@/lib/firestore';
+import { createCategory, createLocation, getCategories, getLocations } from '@/server/repo/repoFirebase';
 import { Loader2, CheckCircle, AlertCircle, Database } from 'lucide-react';
 
 export default function SeedPage() {
@@ -18,18 +18,29 @@ export default function SeedPage() {
     errors: []
   });
 
-  // Données prédéfinies
+  // Données prédéfinies pour la communauté românească și moldovenească
   const predefinedCategories = [
-    'Immobilier',
-    'Véhicules', 
-    'Multimédia',
-    'Maison'
+    { name: 'Electronice & IT', slug: 'electronice-it' },
+    { name: 'Auto & Moto', slug: 'auto-moto' },
+    { name: 'Imobiliare', slug: 'imobiliare' },
+    { name: 'Casă & Grădină', slug: 'casa-gradina' },
+    { name: 'Modă & Frumusețe', slug: 'moda-frumusete' },
+    { name: 'Sport & Hobby', slug: 'sport-hobby' },
+    { name: 'Servicii', slug: 'servicii' },
+    { name: 'Locuri de Muncă', slug: 'locuri-munca' }
   ];
 
   const predefinedLocations = [
-    'Paris',
-    'Lyon',
-    'Marseille'
+    { name: 'Paris', slug: 'paris' },
+    { name: 'Lyon', slug: 'lyon' },
+    { name: 'Marseille', slug: 'marseille' },
+    { name: 'Toulouse', slug: 'toulouse' },
+    { name: 'Nice', slug: 'nice' },
+    { name: 'Nantes', slug: 'nantes' },
+    { name: 'Strasbourg', slug: 'strasbourg' },
+    { name: 'Montpellier', slug: 'montpellier' },
+    { name: 'Bordeaux', slug: 'bordeaux' },
+    { name: 'Lille', slug: 'lille' }
   ];
 
   const handleSeed = async () => {
@@ -50,18 +61,23 @@ export default function SeedPage() {
 
       // Ajouter les catégories
       console.log('🏷️ Ajout des catégories...');
-      for (const categoryName of predefinedCategories) {
+      for (const category of predefinedCategories) {
         try {
-          if (!existingCategoryNames.includes(categoryName.toLowerCase())) {
-            const categoryId = await addCategory(categoryName);
-            results.categories.push(`✅ ${categoryName} (ID: ${categoryId})`);
-            console.log(`✅ Catégorie ajoutée: ${categoryName}`);
+          if (!existingCategoryNames.includes(category.name.toLowerCase())) {
+            const categoryId = await createCategory({
+              name: category.name,
+              slug: category.slug,
+              isActive: true,
+              order: predefinedCategories.indexOf(category)
+            });
+            results.categories.push(`✅ ${category.name} (ID: ${categoryId})`);
+            console.log(`✅ Catégorie ajoutée: ${category.name}`);
           } else {
-            results.categories.push(`⚠️ ${categoryName} (déjà existante)`);
-            console.log(`⚠️ Catégorie déjà existante: ${categoryName}`);
+            results.categories.push(`⚠️ ${category.name} (déjà existante)`);
+            console.log(`⚠️ Catégorie déjà existante: ${category.name}`);
           }
         } catch (error) {
-          const errorMsg = `❌ Erreur pour ${categoryName}: ${error}`;
+          const errorMsg = `❌ Erreur pour ${category.name}: ${error}`;
           results.errors.push(errorMsg);
           console.error(errorMsg);
         }
@@ -73,18 +89,23 @@ export default function SeedPage() {
 
       // Ajouter les localisations
       console.log('📍 Ajout des localisations...');
-      for (const locationName of predefinedLocations) {
+      for (const location of predefinedLocations) {
         try {
-          if (!existingLocationNames.includes(locationName.toLowerCase())) {
-            const locationId = await addLocation(locationName);
-            results.locations.push(`✅ ${locationName} (ID: ${locationId})`);
-            console.log(`✅ Localisation ajoutée: ${locationName}`);
+          if (!existingLocationNames.includes(location.name.toLowerCase())) {
+            const locationId = await createLocation({
+              name: location.name,
+              slug: location.slug,
+              isActive: true,
+              order: predefinedLocations.indexOf(location)
+            });
+            results.locations.push(`✅ ${location.name} (ID: ${locationId})`);
+            console.log(`✅ Localisation ajoutée: ${location.name}`);
           } else {
-            results.locations.push(`⚠️ ${locationName} (déjà existante)`);
-            console.log(`⚠️ Localisation déjà existante: ${locationName}`);
+            results.locations.push(`⚠️ ${location.name} (déjà existante)`);
+            console.log(`⚠️ Localisation déjà existante: ${location.name}`);
           }
         } catch (error) {
-          const errorMsg = `❌ Erreur pour ${locationName}: ${error}`;
+          const errorMsg = `❌ Erreur pour ${location.name}: ${error}`;
           results.errors.push(errorMsg);
           console.error(errorMsg);
         }
@@ -132,7 +153,7 @@ export default function SeedPage() {
                 {predefinedCategories.map((category, index) => (
                   <li key={index} className="flex items-center">
                     <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
-                    {category}
+                    {category.name}
                   </li>
                 ))}
               </ul>
@@ -144,7 +165,7 @@ export default function SeedPage() {
                 {predefinedLocations.map((location, index) => (
                   <li key={index} className="flex items-center">
                     <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-                    {location}
+                    {location.name}
                   </li>
                 ))}
               </ul>

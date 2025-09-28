@@ -1,9 +1,10 @@
 // Firebase Repository - AI NOSTRI PWA
+import { db } from '@/lib/firebase';
 import { 
   collection, 
   doc, 
-  getDocs, 
   getDoc, 
+  getDocs, 
   addDoc, 
   updateDoc, 
   deleteDoc, 
@@ -11,11 +12,15 @@ import {
   where, 
   orderBy, 
   limit, 
-  startAfter,
+  startAfter, 
+  DocumentSnapshot,
   serverTimestamp,
-  DocumentSnapshot
+  Timestamp,
+  increment,
+  arrayUnion,
+  arrayRemove
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { User, Favorite, Report, Chat, AuditLog } from '@/types/models';
 
 // Types
 export interface Category {
@@ -92,15 +97,19 @@ export async function getCategories(): Promise<Category[]> {
   try {
     console.log('Firebase: Fetching categories');
     const categoriesRef = collection(db, 'categories');
-    const q = query(categoriesRef, where('isActive', '==', true), orderBy('order', 'asc'));
+    // Simplified query without orderBy to avoid index requirement
+    const q = query(categoriesRef, where('isActive', '==', true));
     const querySnapshot = await getDocs(q);
     
-    const categories: Category[] = querySnapshot.docs.map(doc => ({
+    let categories: Category[] = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data(),
       createdAt: convertTimestamp(doc.data().createdAt),
       updatedAt: convertTimestamp(doc.data().updatedAt)
     } as Category));
+    
+    // Sort manually by order field
+    categories.sort((a, b) => (a.order || 0) - (b.order || 0));
     
     console.log(`Firebase: Found ${categories.length} categories`);
     return categories;
@@ -150,15 +159,19 @@ export async function getLocations(): Promise<Location[]> {
   try {
     console.log('Firebase: Fetching locations');
     const locationsRef = collection(db, 'locations');
-    const q = query(locationsRef, where('isActive', '==', true), orderBy('order', 'asc'));
+    // Simplified query without orderBy to avoid index requirement
+    const q = query(locationsRef, where('isActive', '==', true));
     const querySnapshot = await getDocs(q);
     
-    const locations: Location[] = querySnapshot.docs.map(doc => ({
+    let locations: Location[] = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data(),
       createdAt: convertTimestamp(doc.data().createdAt),
       updatedAt: convertTimestamp(doc.data().updatedAt)
     } as Location));
+    
+    // Sort manually by order field
+    locations.sort((a, b) => (a.order || 0) - (b.order || 0));
     
     console.log(`Firebase: Found ${locations.length} locations`);
     return locations;
@@ -215,46 +228,10 @@ export async function getListings(filters: ListingFilters = {}): Promise<{
     const listingsRef = collection(db, 'listings');
     let q = query(listingsRef);
     
-    // Apply filters
-    const constraints = [];
-    
-    // Status filter (default to active)
-    if (filters.status) {
-      constraints.push(where('status', '==', filters.status));
-    } else {
-      constraints.push(where('status', '==', 'active'));
-    }
-    
-    // Category filter
-    if (filters.categoryId) {
-      constraints.push(where('categoryId', '==', filters.categoryId));
-    }
-    
-    // Location filter
-    if (filters.locationId) {
-      constraints.push(where('locationId', '==', filters.locationId));
-    }
-    
-    // User filter
-    if (filters.userId) {
-      constraints.push(where('userId', '==', filters.userId));
-    }
-    
-    // Price range filters
-    if (filters.minPrice !== undefined) {
-      constraints.push(where('price', '>=', filters.minPrice));
-    }
-    if (filters.maxPrice !== undefined) {
-      constraints.push(where('price', '<=', filters.maxPrice));
-    }
-    
-    // Add ordering and limit
-    constraints.push(orderBy('createdAt', 'desc'));
-    
+    // TEMPORARY: No where clauses to avoid all index issues
+    // Get all documents and filter client-side
     const pageLimit = filters.limit || 20;
-    constraints.push(limit(pageLimit + 1)); // Get one extra to check if there are more
-    
-    q = query(listingsRef, ...constraints);
+    q = query(listingsRef, limit(100)); // Get more docs for client-side filtering
     
     const querySnapshot = await getDocs(q);
     const docs = querySnapshot.docs;
@@ -269,6 +246,45 @@ export async function getListings(filters: ListingFilters = {}): Promise<{
       createdAt: convertTimestamp(doc.data().createdAt),
       updatedAt: convertTimestamp(doc.data().updatedAt)
     } as Listing));
+    
+    // Apply ALL filters client-side to avoid index issues
+    
+    // Status filter (default to active)
+    if (filters.status) {
+      listings = listings.filter(listing => listing.status === filters.status);
+    } else {
+      listings = listings.filter(listing => listing.status === 'active');
+    }
+    
+    // Category filter
+    if (filters.categoryId) {
+      listings = listings.filter(listing => listing.categoryId === filters.categoryId);
+    }
+    
+    // Location filter
+    if (filters.locationId) {
+      listings = listings.filter(listing => listing.locationId === filters.locationId);
+    }
+    
+    // User filter
+    if (filters.userId) {
+      listings = listings.filter(listing => listing.userId === filters.userId);
+    }
+    
+    // Price range filters
+    if (filters.minPrice !== undefined) {
+      listings = listings.filter(listing => listing.price >= filters.minPrice!);
+    }
+    if (filters.maxPrice !== undefined) {
+      listings = listings.filter(listing => listing.price <= filters.maxPrice!);
+    }
+    
+    // Sort manually by createdAt (since we removed orderBy)
+    listings.sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA; // desc order
+    });
     
     // Text search filter (client-side for now)
     if (filters.q) {
@@ -499,5 +515,292 @@ export async function getListingStats(): Promise<{
   } catch (error) {
     console.error('Error fetching listing stats:', error);
     throw error;
+  }
+}
+
+// ===== NEW FUNCTIONS FOR LISTING PAGE =====
+
+// Get user by ID
+export async function getUserById(uid: string): Promise<User | null> {
+  try {
+    const userDoc = await getDoc(doc(db, 'users', uid));
+    if (!userDoc.exists()) return null;
+    
+    const userData = userDoc.data();
+    return {
+      id: userDoc.id,
+      ...userData,
+      createdAt: convertTimestamp(userData.createdAt),
+      updatedAt: convertTimestamp(userData.updatedAt)
+    } as User;
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    return null;
+  }
+}
+
+// Get similar listings
+export async function getSimilarListings({
+  categoryId,
+  locationId,
+  excludeId,
+  limit: limitCount = 4
+}: {
+  categoryId?: string;
+  locationId?: string;
+  excludeId: string;
+  limit?: number;
+}): Promise<Listing[]> {
+  try {
+    const listingsRef = collection(db, 'listings');
+    
+    // Simple query to avoid index issues - filter client-side
+    const q = query(listingsRef, limit(50));
+    const querySnapshot = await getDocs(q);
+    
+    let listings: Listing[] = [];
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data.status === 'active' && doc.id !== excludeId) {
+        listings.push({
+          id: doc.id,
+          ...data,
+          createdAt: convertTimestamp(data.createdAt),
+          updatedAt: convertTimestamp(data.updatedAt)
+        } as Listing);
+      }
+    });
+    
+    // Client-side filtering for similar listings
+    if (categoryId) {
+      listings = listings.filter(listing => listing.categoryId === categoryId);
+    }
+    if (locationId) {
+      listings = listings.filter(listing => listing.locationId === locationId);
+    }
+    
+    // Sort by creation date and limit
+    listings.sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
+    
+    return listings.slice(0, limitCount);
+  } catch (error) {
+    console.error('Error fetching similar listings:', error);
+    return [];
+  }
+}
+
+// Toggle favorite
+export async function toggleFavorite({
+  userId,
+  listingId
+}: {
+  userId: string;
+  listingId: string;
+}): Promise<boolean> {
+  try {
+    const favoritesRef = collection(db, 'favorites');
+    const q = query(
+      favoritesRef,
+      where('userId', '==', userId),
+      where('listingId', '==', listingId)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    
+    if (querySnapshot.empty) {
+      // Add favorite
+      await addDoc(favoritesRef, {
+        userId,
+        listingId,
+        createdAt: serverTimestamp()
+      });
+      return true; // favorited
+    } else {
+      // Remove favorite
+      const favoriteDoc = querySnapshot.docs[0];
+      await deleteDoc(favoriteDoc.ref);
+      return false; // unfavorited
+    }
+  } catch (error) {
+    console.error('Error toggling favorite:', error);
+    throw error;
+  }
+}
+
+// Check if listing is favorited by user
+export async function isFavorited(userId: string, listingId: string): Promise<boolean> {
+  try {
+    const favoritesRef = collection(db, 'favorites');
+    const q = query(
+      favoritesRef,
+      where('userId', '==', userId),
+      where('listingId', '==', listingId)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    return !querySnapshot.empty;
+  } catch (error) {
+    console.error('Error checking favorite:', error);
+    return false;
+  }
+}
+
+// Get or create chat
+export async function getOrCreateChat({
+  buyerId,
+  sellerId,
+  listingId
+}: {
+  buyerId: string;
+  sellerId: string;
+  listingId: string;
+}): Promise<string> {
+  try {
+    const chatsRef = collection(db, 'chats');
+    
+    // Check if chat already exists
+    const q = query(
+      chatsRef,
+      where('participants', 'array-contains', buyerId)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    
+    // Find existing chat with both participants and same listing
+    for (const chatDoc of querySnapshot.docs) {
+      const chatData = chatDoc.data();
+      if (
+        chatData.participants.includes(sellerId) &&
+        chatData.listingId === listingId
+      ) {
+        return chatDoc.id;
+      }
+    }
+    
+    // Create new chat
+    const newChatRef = await addDoc(chatsRef, {
+      participants: [buyerId, sellerId],
+      listingId,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+    
+    return newChatRef.id;
+  } catch (error) {
+    console.error('Error getting or creating chat:', error);
+    throw error;
+  }
+}
+
+// Increment views - Smart tracking
+export async function incrementViews(listingId: string, userId?: string): Promise<void> {
+  try {
+    const listingRef = doc(db, 'listings', listingId);
+    
+    // Always increment view count
+    await updateDoc(listingRef, {
+      views: increment(1),
+      lastViewedAt: serverTimestamp()
+    });
+    
+    // Log view event for analytics (optional)
+    if (userId) {
+      await logEvent({
+        listingId,
+        userId,
+        type: 'view',
+        metadata: { timestamp: new Date().toISOString() }
+      });
+    }
+  } catch (error) {
+    console.error('Error incrementing views:', error);
+  }
+}
+
+// Log event for audit
+export async function logEvent({
+  listingId,
+  userId,
+  type,
+  metadata
+}: {
+  listingId: string;
+  userId: string;
+  type: 'phone_view' | 'report' | 'contact' | 'view';
+  metadata?: Record<string, any>;
+}): Promise<void> {
+  try {
+    const auditRef = collection(db, 'audit_logs');
+    await addDoc(auditRef, {
+      listingId,
+      userId,
+      type,
+      metadata: metadata || {},
+      createdAt: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error logging event:', error);
+    // Don't throw - audit logging shouldn't break functionality
+  }
+}
+
+// Create report
+export async function createReport({
+  listingId,
+  reporterId,
+  reason,
+  details
+}: {
+  listingId: string;
+  reporterId: string;
+  reason: 'spam' | 'inappropriate' | 'fake' | 'duplicate' | 'other';
+  details?: string;
+}): Promise<string> {
+  try {
+    const reportsRef = collection(db, 'reports');
+    const reportRef = await addDoc(reportsRef, {
+      listingId,
+      reporterId,
+      reason,
+      details: details || '',
+      status: 'pending',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+    
+    // Log the report event
+    await logEvent({
+      listingId,
+      userId: reporterId,
+      type: 'report',
+      metadata: { reason, details }
+    });
+    
+    return reportRef.id;
+  } catch (error) {
+    console.error('Error creating report:', error);
+    throw error;
+  }
+}
+
+// Get user's active listings count
+export async function getUserListingsCount(userId: string): Promise<number> {
+  try {
+    const listingsRef = collection(db, 'listings');
+    const q = query(
+      listingsRef,
+      where('userId', '==', userId),
+      where('status', '==', 'active')
+    );
+    
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.size;
+  } catch (error) {
+    console.error('Error getting user listings count:', error);
+    return 0;
   }
 }
