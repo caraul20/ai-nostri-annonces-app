@@ -8,6 +8,7 @@ interface SubcategoryStepProps {
   category: CategoryWithSubcategories;
   selectedSubcategoryId?: string;
   onSubcategorySelect: (subcategoryId: string, subcategoryName: string) => void;
+  onBackToCategory: () => void;
   errors?: string[];
 }
 
@@ -15,6 +16,7 @@ export default function SubcategoryStep({
   category, 
   selectedSubcategoryId, 
   onSubcategorySelect, 
+  onBackToCategory,
   errors 
 }: SubcategoryStepProps) {
   return (
@@ -22,6 +24,13 @@ export default function SubcategoryStep({
 
       <div className="text-center mb-8">
         <div className="flex items-center justify-center mb-4">
+          <button
+            onClick={onBackToCategory}
+            className="mr-4 p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            title="Înapoi la categorii"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
           <div className="mr-3">
             <CategoryIcon iconKey={category.id} size={36} />
           </div>
