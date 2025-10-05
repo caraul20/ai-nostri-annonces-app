@@ -3,6 +3,7 @@ import { getListings, getCategories, getLocations, getCategoryById, getLocationB
 import AdCard from '@/components/AdCard';
 import { Button } from '@/components/ui/button';
 import SearchFilters from '@/components/SearchFilters';
+import ListingsSection from '@/components/ListingsSection';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Plus, Package, ArrowRight } from 'lucide-react';
@@ -188,40 +189,19 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           </div>
         </div>
       </section>
-
       {/* Search Filters - Elegant Integration */}
       <SearchFilters categories={categories} locations={locations} />
 
       {/* Secțiunea de anunțuri - layout compact */}
       <section className="py-16 bg-white">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl md:text-3xl font-bold text-gray-900">
-              Cele mai noi anunțuri ({listingsResult.total})
-            </h2>
-            <Link href="/" className="text-sm text-gray-600 hover:text-green-600">
-              Vezi toate anunțurile →
-            </Link>
-          </div>
-
-          {sp.q && (
-            <div className="mb-6 text-sm text-gray-600 bg-green-50 px-4 py-2 rounded-full inline-block border border-green-200">
-              Rezultate pentru: <span className="font-semibold text-green-600">"{sp.q}"</span>
-            </div>
-          )}
-
+        <div className="container-custom">
           {enrichedListings.length > 0 ? (
             <>
-              <div className="grid-responsive" role="main" aria-label="Lista de anunțuri">
-                {enrichedListings.map(({ listing, category, location }) => (
-                  <AdCard
-                    key={listing.id}
-                    listing={listing}
-                    category={category}
-                    location={location}
-                  />
-                ))}
-              </div>
+              <ListingsSection 
+                enrichedListings={enrichedListings}
+                total={listingsResult.total}
+                searchQuery={sp.q}
+              />
 
               {/* Paginare */}
               {(filters.page > 1 || listingsResult.hasMore) && (

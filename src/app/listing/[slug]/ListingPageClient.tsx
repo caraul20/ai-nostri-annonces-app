@@ -141,6 +141,7 @@ export default function ListingPageClient({
           sellerId={listing.userId}
           price={listing.price}
           title={listing.title}
+          phone={listing.phone}
         />
       </div>
 

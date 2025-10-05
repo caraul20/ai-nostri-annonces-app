@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { createCategory, createLocation, getCategories, getLocations } from '@/server/repo/repoFirebase';
+import { createCategory, createLocation, getCategories, getLocations, createListing } from '@/server/repo/repoFirebase';
+import { db } from '@/lib/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Loader2, CheckCircle, AlertCircle, Database } from 'lucide-react';
 
 export default function SeedPage() {
@@ -11,10 +13,12 @@ export default function SeedPage() {
   const [seedResults, setSeedResults] = useState<{
     categories: string[];
     locations: string[];
+    listings: string[];
     errors: string[];
   }>({
     categories: [],
     locations: [],
+    listings: [],
     errors: []
   });
 
@@ -46,12 +50,13 @@ export default function SeedPage() {
   const handleSeed = async () => {
     setIsSeeding(true);
     setSeedStatus('idle');
-    setSeedResults({ categories: [], locations: [], errors: [] });
+    setSeedResults({ categories: [], locations: [], listings: [], errors: [] });
 
     try {
       const results = {
         categories: [] as string[],
         locations: [] as string[],
+        listings: [] as string[],
         errors: [] as string[]
       };
 

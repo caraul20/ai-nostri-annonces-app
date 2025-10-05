@@ -43,23 +43,24 @@ export interface Location {
   createdAt?: Date;
   updatedAt?: Date;
 }
-
 export interface Listing {
   id?: string;
   title: string;
   description: string;
   price: number;
-  images: string[];
   categoryId: string;
   locationId: string;
+  images: string[];
   userId: string;
+  phone?: string; // Numărul de telefon specific pentru acest anunț
   status: 'active' | 'inactive' | 'sold' | 'hidden' | 'deleted';
   slug?: string;
-  createdAt?: Date;
-  updatedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
   views?: number;
   featured?: boolean;
   expiresAt?: Date;
+  customFields?: { [key: string]: any };
 }
 
 export interface ListingFilters {
@@ -571,22 +572,58 @@ export async function getSimilarListings({
       }
     });
     
-    // Client-side filtering for similar listings
-    if (categoryId) {
-      listings = listings.filter(listing => listing.categoryId === categoryId);
+    console.log('Total active listings found:', listings.length);
+    console.log('Looking for categoryId:', categoryId, 'locationId:', locationId);
+    
+    // Try different filtering strategies
+    let filteredListings: Listing[] = [];
+    
+    // Strategy 1: Same category and location
+    if (categoryId && locationId) {
+      filteredListings = listings.filter(listing => 
+        listing.categoryId === categoryId && listing.locationId === locationId
+      );
+      console.log('Same category + location:', filteredListings.length);
     }
-    if (locationId) {
-      listings = listings.filter(listing => listing.locationId === locationId);
+    
+    // Strategy 2: If not enough, try same category only
+    if (filteredListings.length < limitCount && categoryId) {
+      const categoryOnly = listings.filter(listing => listing.categoryId === categoryId);
+      filteredListings = [...filteredListings, ...categoryOnly.filter(l => 
+        !filteredListings.some(fl => fl.id === l.id)
+      )];
+      console.log('Same category only:', filteredListings.length);
+    }
+    
+    // Strategy 3: If still not enough, try same location only
+    if (filteredListings.length < limitCount && locationId) {
+      const locationOnly = listings.filter(listing => listing.locationId === locationId);
+      filteredListings = [...filteredListings, ...locationOnly.filter(l => 
+        !filteredListings.some(fl => fl.id === l.id)
+      )];
+      console.log('Same location only:', filteredListings.length);
+    }
+    
+    // Strategy 4: If still not enough, get any recent listings
+    if (filteredListings.length < limitCount) {
+      const remaining = listings.filter(l => 
+        !filteredListings.some(fl => fl.id === l.id)
+      );
+      filteredListings = [...filteredListings, ...remaining];
+      console.log('Any listings:', filteredListings.length);
     }
     
     // Sort by creation date and limit
-    listings.sort((a, b) => {
+    filteredListings.sort((a, b) => {
       const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
       const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
       return dateB - dateA;
     });
     
-    return listings.slice(0, limitCount);
+    const result = filteredListings.slice(0, limitCount);
+    console.log('Final similar listings:', result.length);
+    
+    return result;
   } catch (error) {
     console.error('Error fetching similar listings:', error);
     return [];

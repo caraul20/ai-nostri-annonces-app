@@ -23,6 +23,9 @@ const CreateListingSchema = z.object({
     .min(1, 'Selectează o locație'),
   userId: z.string()
     .min(1, 'Utilizatorul trebuie să fie autentificat'),
+  phone: z.string()
+    .min(10, 'Numărul de telefon trebuie să aibă cel puțin 10 cifre')
+    .max(20, 'Numărul de telefon este prea lung'),
   images: z.array(z.string().min(1, 'Imagine invalidă'))
     .max(5, 'Maximum 5 imagini permise')
     .optional()
@@ -37,6 +40,7 @@ export type CreateListingFormState = {
     categoryId?: string[];
     locationId?: string[];
     userId?: string[];
+    phone?: string[];
     images?: string[];
     _form?: string[];
   };
@@ -94,8 +98,24 @@ export async function createListing(
     categoryId: formData.get('categoryId'),
     locationId: formData.get('locationId'),
     userId: formData.get('userId'),
+    phone: formData.get('phone'),
     images: JSON.parse(formData.get('images') as string || '[]'),
   };
+
+  // Extract custom fields (they start with 'custom_')
+  const customFields: { [key: string]: any } = {};
+  for (const [key, value] of formData.entries()) {
+    if (key.startsWith('custom_')) {
+      const fieldName = key.replace('custom_', '');
+      try {
+        // Try to parse as JSON first (for arrays/objects)
+        customFields[fieldName] = JSON.parse(value as string);
+      } catch {
+        // If not JSON, use as string
+        customFields[fieldName] = value;
+      }
+    }
+  }
 
   // Conversion du prix en nombre
   const priceNumber = rawData.price ? parseFloat(rawData.price as string) : 0;
@@ -129,6 +149,15 @@ export async function createListing(
   let listingId: string;
   
   try {
+    // Actualizează profilul utilizatorului cu numărul de telefon
+    const userRef = doc(db, 'users', validatedData.userId);
+    await setDoc(userRef, {
+      phone: validatedData.phone,
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+
+    console.log('Profil utilizator actualizat cu telefonul:', validatedData.phone);
+
     // Créer l'annonce dans Firestore
     listingId = await createListingFirebase({
       title: validatedData.title,
@@ -136,13 +165,15 @@ export async function createListing(
       price: validatedData.price,
       categoryId: validatedData.categoryId,
       locationId: validatedData.locationId,
+      phone: validatedData.phone, // Salvează telefonul direct în anunț
       images: validatedData.images,
       userId: validatedData.userId,
       status: 'active',
       createdAt: new Date(),
       updatedAt: new Date(),
       views: 0,
-      featured: false
+      featured: false,
+      customFields: customFields // Add custom fields to the listing
     });
 
     console.log('Anunț creat cu succes:', listingId);

@@ -90,7 +90,7 @@ function Header() {
           <div className="flex items-center space-x-3">
             <AuthHeader />
             
-            <Link href="/new" className="focus-ring">
+            <Link href="/new/wizard" className="focus-ring">
               <Button 
                 className="btn-primary min-h-[44px] px-4 py-2"
                 aria-label="Publică un anunț nou"

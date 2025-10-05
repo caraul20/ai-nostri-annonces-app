@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { MapPin, Tag, Calendar, Heart } from 'lucide-react';
+import { MapPin, Tag, Calendar, Heart, Eye, Camera, Bed, Bath, ChefHat, Square } from 'lucide-react';
 // Serialized interfaces for client component
 interface SerializedListing {
   id?: string;
@@ -105,7 +105,7 @@ export default function AdCard({ listing, category, location }: AdCardProps) {
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
               <div className="text-center">
-                <div className="text-4xl mb-2">📷</div>
+                <Camera className="w-8 h-8 text-gray-400 mb-2 mx-auto" />
                 <div className="text-sm text-gray-500">Fără imagine</div>
               </div>
             </div>
@@ -165,9 +165,7 @@ export default function AdCard({ listing, category, location }: AdCardProps) {
               <div className="flex items-center gap-3 text-gray-400">
                 {views > 0 && (
                   <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 flex items-center justify-center">
-                      👁️
-                    </div>
+                    <Eye className="w-3 h-3" />
                     <span>{views}</span>
                   </div>
                 )}
@@ -198,20 +196,30 @@ export default function AdCard({ listing, category, location }: AdCardProps) {
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gray-100">
               <div className="text-center">
-                <div className="text-4xl mb-2">📷</div>
+                <Camera className="w-8 h-8 text-gray-400 mb-2 mx-auto" />
                 <div className="text-sm text-gray-500">Fără imagine</div>
               </div>
             </div>
           )}
           
           {/* Heart icon - top right */}
-          <div className="absolute top-3 right-3">
-            <div className="w-8 h-8 bg-white/90 rounded-full flex items-center justify-center">
-              <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-              </svg>
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              toggleFavorite();
+            }}
+            disabled={isLoading}
+            className="absolute top-3 right-3"
+          >
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
+              isFavorite 
+                ? 'bg-red-50 text-red-600' 
+                : 'bg-white/90 text-gray-600 hover:text-red-600'
+            }`}>
+              <Heart className={`w-4 h-4 ${isFavorite ? 'fill-current' : ''}`} />
             </div>
-          </div>
+          </button>
         </div>
 
         {/* Content - EXACT layout din imagine */}
@@ -224,16 +232,12 @@ export default function AdCard({ listing, category, location }: AdCardProps) {
           {/* Bedrooms/Bathrooms info */}
           <div className="flex items-center gap-4 mb-2">
             <div className="flex items-center gap-1">
-              <div className="w-4 h-4 flex items-center justify-center">
-                🛏️
-              </div>
-              <span className="text-xs text-gray-600">3 Bedrooms</span>
+              <Bed className="w-3 h-3 text-gray-400" />
+              <span className="text-xs text-gray-600">3 Camere</span>
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-4 h-4 flex items-center justify-center">
-                🚿
-              </div>
-              <span className="text-xs text-gray-600">2 Bathrooms</span>
+              <Bath className="w-3 h-3 text-gray-400" />
+              <span className="text-xs text-gray-600">2 Băi</span>
             </div>
           </div>
           
@@ -244,8 +248,14 @@ export default function AdCard({ listing, category, location }: AdCardProps) {
           
           {/* Property details - small text */}
           <div className="flex items-center gap-4 text-xs text-gray-500 mb-3">
-            <span>961 Sq Ft</span>
-            <span>1 Kitchen</span>
+            <div className="flex items-center gap-1">
+              <Square className="w-3 h-3 text-gray-400" />
+              <span>89 m²</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <ChefHat className="w-3 h-3 text-gray-400" />
+              <span>1 Bucătărie</span>
+            </div>
           </div>
           
           {/* Price - mare, bold */}
@@ -255,7 +265,7 @@ export default function AdCard({ listing, category, location }: AdCardProps) {
           
           {/* Contact button - verde, full width */}
           <button className="w-full bg-teal-600 hover:bg-teal-700 text-white py-2 px-4 text-sm font-medium transition-colors">
-            Contact The Agent
+            Contactează Vânzătorul
           </button>
         </div>
       </div>

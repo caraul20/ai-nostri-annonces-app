@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Flag, Heart, Share2 } from 'lucide-react';
+import { Flag, Heart, Share2, MapPin, Calendar, Eye, Tag } from 'lucide-react';
 import { incrementViews, getUserById, logEvent } from '@/server/repo/repoFirebase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChat } from '@/hooks/useChat';
@@ -10,6 +10,7 @@ import ListingGallery from '@/components/listing/ListingGallery';
 import ListingSidebar from '@/components/listing/ListingSidebar';
 import ReportDialog from '@/components/listing/ReportDialog';
 import SimilarListings from '@/components/listing/SimilarListings';
+import CustomFieldsDisplay from '@/components/listing/CustomFieldsDisplay';
 import { User } from '@/types/models';
 // Serialized types for client component
 interface SerializedListing {
@@ -28,6 +29,7 @@ interface SerializedListing {
   views?: number;
   featured?: boolean;
   expiresAt: string | null;
+  customFields?: { [key: string]: any };
 }
 
 interface SerializedCategory {
@@ -95,11 +97,6 @@ export default function ListingPageClient({
   };
 
   const handleShowPhone = async () => {
-    if (!user?.id) {
-      window.location.href = `/login?next=/listing/${listing.id}`;
-      return;
-    }
-
     if (showPhone) return; // Already shown
 
     setIsLoadingPhone(true);
@@ -109,13 +106,15 @@ export default function ListingPageClient({
       setSeller(sellerData);
       setShowPhone(true);
 
-      // Log phone view event
-      await logEvent({
-        listingId: listing.id!,
-        userId: user.id,
-        type: 'phone_view',
-        metadata: { sellerId: listing.userId }
-      });
+      // Log phone view event (only if user is logged in)
+      if (user?.id) {
+        await logEvent({
+          listingId: listing.id!,
+          userId: user.id,
+          type: 'phone_view',
+          metadata: { sellerId: listing.userId }
+        });
+      }
     } catch (error) {
       console.error('Error showing phone:', error);
     } finally {
@@ -165,7 +164,7 @@ export default function ListingPageClient({
             {listing.title}
           </h1>
           
-          <div className="text-4xl font-bold text-green-600">
+          <div className="text-4xl font-bold text-gray-900">
             {new Intl.NumberFormat('ro-RO', {
               style: 'currency',
               currency: 'EUR',
@@ -174,17 +173,24 @@ export default function ListingPageClient({
             }).format(listing.price)}
           </div>
           
-          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
-            <span>{category?.name || 'Categorie necunoscută'}</span>
-            <span>•</span>
-            <span>{location?.name || 'Locație necunoscută'}</span>
-            <span>•</span>
-            <span>Publicat {formatDate(listing.createdAt)}</span>
+          <div className="flex flex-wrap items-center gap-6 text-sm text-gray-500">
+            <div className="flex items-center gap-1">
+              <Tag className="w-4 h-4" />
+              <span>{category?.name || 'Categorie necunoscută'}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <MapPin className="w-4 h-4" />
+              <span>{location?.name || 'Locație necunoscută'}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Calendar className="w-4 h-4" />
+              <span>Publicat {formatDate(listing.createdAt)}</span>
+            </div>
             {listing.views && listing.views > 0 && (
-              <>
-                <span>•</span>
+              <div className="flex items-center gap-1">
+                <Eye className="w-4 h-4" />
                 <span>{listing.views} vizualizări</span>
-              </>
+              </div>
             )}
           </div>
         </div>
@@ -207,7 +213,7 @@ export default function ListingPageClient({
             {listing.description.length > 300 && (
               <button
                 onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
-                className="text-green-600 hover:text-green-700 text-sm mt-2 underline"
+                className="text-gray-600 hover:text-gray-900 text-sm mt-2 underline"
               >
                 {isDescriptionExpanded ? 'Vezi mai puțin' : 'Vezi mai mult'}
               </button>
@@ -222,6 +228,16 @@ export default function ListingPageClient({
             Raportează anunțul
           </button>
         </div>
+
+        {/* Custom Fields Display */}
+        {listing.customFields && Object.keys(listing.customFields).length > 0 && (
+          <div className="py-8 border-t border-gray-200">
+            <CustomFieldsDisplay 
+              customFields={listing.customFields}
+              categoryId={listing.categoryId}
+            />
+          </div>
+        )}
 
         {/* Similar Listings */}
         <div className="mt-12">

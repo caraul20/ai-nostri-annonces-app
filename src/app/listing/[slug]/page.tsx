@@ -128,7 +128,8 @@ export default async function ListingPage({ params }: ListingPageProps) {
     updatedAt: safeToISOString(listing.updatedAt),
     views: listing.views || 0,
     featured: listing.featured || false,
-    expiresAt: safeToISOString(listing.expiresAt)
+    expiresAt: safeToISOString(listing.expiresAt),
+    customFields: listing.customFields || {}
   };
 
   const serializedCategory = category ? {

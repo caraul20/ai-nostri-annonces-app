@@ -18,7 +18,7 @@ export default function ListingSidebar({
   title 
 }: ListingSidebarProps) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative z-10">
       {/* Card Preț + Acțiuni */}
       <StickyActions
         listingId={listingId}
